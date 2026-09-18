@@ -271,6 +271,15 @@
       nuovaPaginaSeServe(14);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
       doc.text('Punto ' + r.n + (r.r ? '  —  ' + r.r : ''), 14, y); y += 5;
+      // testoPunto(n) e' gia' definita da app_modello.html: e' il testo del
+      // punto di verifica cosi' come compare nella check list (colonna C).
+      var voce = (typeof testoPunto === 'function') ? testoPunto(r.n) : '';
+      if (voce) {
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(90);
+        var lineeVoce = doc.splitTextToSize(voce.split('\n')[0], 178);
+        doc.text(lineeVoce, 14, y); y += lineeVoce.length * 3.8 + 2;
+        doc.setTextColor(0);
+      }
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
       if (r.nota && r.nota.trim()) {
         var linee = doc.splitTextToSize(r.nota.trim(), 178);
