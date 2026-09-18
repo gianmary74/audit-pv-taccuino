@@ -31,7 +31,21 @@
       PDF di sintesi grezza con le miniature delle foto scattate), li
       impacchetta in uno .zip e apre il foglio di condivisione nativo di
       Android, cosi' l'utente sceglie con un tocco dove mandarlo (pCloud,
-      mail, ecc.) senza che l'app debba conoscere alcuna chiave o token. */
+      mail, ecc.) senza che l'app debba conoscere alcuna chiave o token. Il
+      JSON dentro lo zip e' lo stesso contenuto che il vecchio pulsante
+      "Esporta per Claude" mostrava da copiare: quel pulsante (originale del
+      taccuino) e' quindi nascosto qui, perche' ridondante.
+   4. Scatto senza schermata di conferma. La fotocamera nativa di Android
+      (quella richiamata da Camera.getPhoto) mostra sempre, dopo lo scatto,
+      una propria schermata di revisione con OK/Riscatta: e' una schermata
+      dell'app fotocamera del telefono, non del taccuino, e non si puo'
+      disattivare da qui. Per evitarla, lo scatto usa una fotocamera "in
+      pagina" (flusso video via getUserMedia dentro la webview, con un solo
+      pulsante di scatto): il tocco sul pulsante e' l'unico gesto, la foto
+      viene salvata subito e non c'e' nessuna schermata successiva da
+      confermare. Se il dispositivo non supporta getUserMedia si ripiega
+      sulla fotocamera nativa di sistema (con la sua conferma), cosi' lo
+      scatto non si rompe mai del tutto. */
 (function () {
   function nativo() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -52,7 +66,10 @@
     '.banner{padding-top:env(safe-area-inset-top)}' +
     '.banner .wrap{flex-wrap:wrap;row-gap:6px}' +
     '.banner .grow{flex:1 1 100%;min-width:0}' +
-    '.banner button{flex:0 0 auto;padding:7px 10px;font-size:12.5px}';
+    '.banner button{flex:0 0 auto;padding:7px 10px;font-size:12.5px}' +
+    // "Esporta per Claude" (pulsante originale del taccuino) e' ridondante
+    // col nuovo "Esporta e condividi": il suo JSON e' lo stesso contenuto.
+    '#bEsporta{display:none}';
   document.head.appendChild(stile);
 
   var Filesystem = window.Capacitor.Plugins.Filesystem;
@@ -88,27 +105,109 @@
   function cartellaFotoSessione() {
     return 'foto_catturate/' + sessione().id;   // sessione() e' gia' definita dal taccuino
   }
-  async function scatta(n, et) {
+
+  // Il permesso fotocamera serve comunque (lo richiede la webview prima di
+  // concedere getUserMedia): si continua a chiederlo tramite il plugin
+  // Camera, anche se poi lo scatto vero non passa piu' da li'.
+  async function assicuraPermessoFotocamera() {
+    if (!Camera || !Camera.checkPermissions) return true;
+    try {
+      var stato = await Camera.checkPermissions();
+      if (stato && stato.camera === 'granted') return true;
+      stato = await Camera.requestPermissions({ permissions: ['camera'] });
+      return !!(stato && stato.camera === 'granted');
+    } catch (e) { return true; /* non blocca: si tenta comunque getUserMedia */ }
+  }
+
+  // Fotocamera "in pagina": un solo pulsante di scatto, nessuna schermata di
+  // conferma dopo. Risolve con {base64, formato} oppure null se annullata.
+  function catturaConGetUserMedia() {
+    return new Promise(function (resolve) {
+      var overlay, video, stream, chiuso = false;
+      function chiudi(risultato) {
+        if (chiuso) return; chiuso = true;
+        if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        resolve(risultato);
+      }
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1600 }, height: { ideal: 1200 } },
+        audio: false
+      }).then(function (s) {
+        stream = s;
+        overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;' +
+          'display:flex;align-items:center;justify-content:center;overflow:hidden';
+        video = document.createElement('video');
+        video.autoplay = true; video.playsInline = true; video.muted = true;
+        video.style.cssText = 'width:100%;height:100%;object-fit:cover';
+        video.srcObject = stream;
+
+        var barra = document.createElement('div');
+        barra.style.cssText = 'position:absolute;left:0;right:0;bottom:0;display:flex;' +
+          'align-items:center;justify-content:space-between;padding:18px 24px calc(18px + env(safe-area-inset-bottom));' +
+          'background:linear-gradient(transparent,rgba(0,0,0,.65))';
+
+        var bAnnulla = document.createElement('button');
+        bAnnulla.type = 'button'; bAnnulla.textContent = 'Annulla';
+        bAnnulla.style.cssText = 'background:transparent;color:#fff;border:1px solid rgba(255,255,255,.7);' +
+          'border-radius:8px;padding:10px 16px;font-size:14px';
+
+        var bScatta = document.createElement('button');
+        bScatta.type = 'button'; bScatta.setAttribute('aria-label', 'Scatta');
+        bScatta.style.cssText = 'width:68px;height:68px;border-radius:50%;background:#fff;' +
+          'border:4px solid rgba(255,255,255,.45)';
+
+        var spazio = document.createElement('div'); spazio.style.cssText = 'width:64px';
+
+        barra.appendChild(bAnnulla); barra.appendChild(bScatta); barra.appendChild(spazio);
+        overlay.appendChild(video); overlay.appendChild(barra);
+        document.body.appendChild(overlay);
+
+        bAnnulla.addEventListener('click', function () { chiudi(null); });
+        bScatta.addEventListener('click', function () {
+          // Il tocco sul pulsante E' lo scatto: nessuna schermata dopo.
+          var canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 1280;
+          canvas.height = video.videoHeight || 960;
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          var dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+          chiudi({ base64: dataUrl.split(',')[1], formato: 'jpeg' });
+        });
+      }).catch(function () { chiudi(undefined); /* undefined = non disponibile: si ripiega */ });
+    });
+  }
+
+  async function catturaConCameraNativa() {
     try {
       var foto = await Camera.getPhoto({
-        quality: 70,
-        allowEditing: false,
-        resultType: 'base64',
-        source: 'CAMERA',
-        saveToGallery: true
+        quality: 70, allowEditing: false, resultType: 'base64',
+        source: 'CAMERA', saveToGallery: true
       });
-      if (!foto || !foto.base64String) return;
-      var ext = (foto.format || 'jpeg').replace('jpg', 'jpeg');
-      var nomeFile = (n ? String(n) : 'libero') + '__' + Date.now() + '.' + ext;
+      if (!foto || !foto.base64String) return null;
+      return { base64: foto.base64String, formato: (foto.format || 'jpeg').replace('jpg', 'jpeg') };
+    } catch (e) { return null; /* scatto annullato dall'utente */ }
+  }
+
+  async function scatta(n, et) {
+    await assicuraPermessoFotocamera();
+    var risultato;
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      risultato = await catturaConGetUserMedia();
+    }
+    if (risultato === undefined) risultato = await catturaConCameraNativa();   // ripiego
+    if (!risultato) return;   // annullato dall'utente
+    var nomeFile = (n ? String(n) : 'libero') + '__' + Date.now() + '.' + risultato.formato;
+    try {
       await Filesystem.writeFile({
         path: cartellaFotoSessione() + '/' + nomeFile,
-        data: foto.base64String,
+        data: risultato.base64,
         directory: DIR_DATA,
         recursive: true
       });
       toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero'));
     } catch (e) {
-      /* scatto annullato dall'utente: non e' un errore da segnalare */
+      toast('Salvataggio foto non riuscito: ' + (e && e.message ? e.message : e));
     }
   }
 
