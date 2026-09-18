@@ -45,7 +45,19 @@
       viene salvata subito e non c'e' nessuna schermata successiva da
       confermare. Se il dispositivo non supporta getUserMedia si ripiega
       sulla fotocamera nativa di sistema (con la sua conferma), cosi' lo
-      scatto non si rompe mai del tutto. */
+      scatto non si rompe mai del tutto.
+   5. Negozio prima di tutto. La scheda "Negozio" (la vecchia scheda "Giro",
+      spostata qui in prima posizione solo a video via CSS "order", senza
+      toccare l'ordine dei tab nell'HTML originale) e' l'unica raggiungibile
+      finche' la sessione aperta non ha un negozio: le altre due schede
+      restano disabilitate e, se qualcosa tenta comunque di aprire una
+      finestra foto o la scheda di un punto, l'azione viene bloccata con un
+      avviso invece di essere eseguita.
+   6. Pulsante "Svuota memoria": cancella dalla memoria del telefono (e dalle
+      foto private dell'app) tutti i sopralluoghi gia' in elenco tranne
+      quello aperto in questo momento, per non lasciare accumulare negozi
+      gia' esportati e lavorati. Chiede sempre conferma prima, perche' non e'
+      reversibile. */
 (function () {
   function nativo() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -69,7 +81,13 @@
     '.banner button{flex:0 0 auto;padding:7px 10px;font-size:12.5px}' +
     // "Esporta per Claude" (pulsante originale del taccuino) e' ridondante
     // col nuovo "Esporta e condividi": il suo JSON e' lo stesso contenuto.
-    '#bEsporta{display:none}';
+    '#bEsporta{display:none}' +
+    // La scheda "Negozio" (id storico #tabGiro) va per prima: solo ordine
+    // visivo (flex order), l'HTML e la logica del taccuino restano quelli
+    // di sempre.
+    '#tabGiro{order:-1}' +
+    'nav.tab button:disabled{opacity:.4}' +
+    '#avvisoNegozio{color:var(--accent,#B4530A);font-weight:600}';
   document.head.appendChild(stile);
 
   var Filesystem = window.Capacitor.Plugins.Filesystem;
@@ -269,6 +287,123 @@
     var ta = document.getElementById('dNota');
     if (ta) ta.value = '';
   };
+
+  /* ------------------ negozio prima di tutto ------------------ */
+  // Finche' la sessione aperta non ha un negozio (campo "Insegna e citta'",
+  // riempito a mano o scegliendo un negozio in programma) non ha senso
+  // segnare rilievi o scattare foto: finirebbero attribuiti al sopralluogo
+  // sbagliato. sessione() e' gia' definita dal taccuino originale.
+  function negozioSelezionato() {
+    try {
+      var s = window.sessione && window.sessione();
+      return !!(s && s.negozio && String(s.negozio).trim());
+    } catch (e) { return true; }   // in dubbio non si blocca nulla
+  }
+
+  function aggiornaBloccoNegozio() {
+    var ok = negozioSelezionato();
+    var tR = document.getElementById('tabRilievi');
+    var tE = document.getElementById('tabElenco');
+    if (tR) { tR.disabled = !ok; tR.setAttribute('aria-disabled', String(!ok)); }
+    if (tE) { tE.disabled = !ok; tE.setAttribute('aria-disabled', String(!ok)); }
+    var pannello = document.getElementById('vGiro');
+    var avviso = document.getElementById('avvisoNegozio');
+    if (pannello) {
+      if (!ok) {
+        if (!avviso) {
+          avviso = document.createElement('p');
+          avviso.id = 'avvisoNegozio'; avviso.className = 'nota-uso';
+          avviso.textContent = 'Seleziona prima il negozio (o scrivi insegna e citta\''
+            + '): senza negozio le altre due schede restano bloccate, per non attribuire rilievi e foto al negozio sbagliato.';
+          pannello.insertBefore(avviso, pannello.firstChild);
+        }
+      } else if (avviso) { avviso.remove(); }
+    }
+  }
+
+  // mostra(nome) e' la funzione originale che cambia scheda visibile. Qui si
+  // impedisce di raggiungere "Rilievi" o "Tutti i punti" finche' manca il
+  // negozio, riportando sempre a "Giro" (la scheda "Negozio").
+  var _mostra = window.mostra;
+  window.mostra = function (nome) {
+    if (nome !== 'Giro' && !negozioSelezionato()) {
+      toast('Seleziona prima il negozio');
+      nome = 'Giro';
+    }
+    _mostra(nome);
+    aggiornaBloccoNegozio();
+  };
+
+  // Doppia sicurezza: anche se qualcosa aprisse comunque una finestra foto o
+  // la scheda di un punto senza passare dai tab (es. una chiamata diretta),
+  // l'azione viene bloccata qui.
+  var _apriFotoConNegozio = window.apriFoto;
+  window.apriFoto = function (n, et) {
+    if (!negozioSelezionato()) { toast('Seleziona prima il negozio'); window.mostra('Giro'); return; }
+    _apriFotoConNegozio(n, et);
+  };
+  var _apriPuntoConNegozio = window.apriPunto;
+  window.apriPunto = function (n) {
+    if (!negozioSelezionato()) { toast('Seleziona prima il negozio'); window.mostra('Giro'); return; }
+    _apriPuntoConNegozio(n);
+  };
+
+  // rendiTesta() e' la funzione originale che aggiorna testata, campi del
+  // negozio e conteggi: viene chiamata sia da rendiTutto() sia da ogni
+  // singolo campo del negozio (insegna, cdc, data, negozio in programma,
+  // cambio sessione). E' quindi il punto giusto per tenere aggiornato anche
+  // il blocco delle schede, senza dover agganciare ogni singolo handler.
+  var _rendiTesta = window.rendiTesta;
+  window.rendiTesta = function () {
+    _rendiTesta();
+    aggiornaBloccoNegozio();
+  };
+
+  // Etichetta del tab: resta lo stesso tab "Giro" del taccuino originale
+  // (id, logica e dati invariati), ma il testo visibile si chiarisce dato
+  // che ora e' il primo passo obbligato.
+  (function rinominaTabGiro() {
+    var t = document.getElementById('tabGiro');
+    if (t) t.textContent = 'Negozio';
+  })();
+
+  // Stato iniziale: se la pagina si apre gia' su una sessione senza negozio
+  // (primo avvio, o sessione senza dati scelta dal menu), si riporta subito
+  // alla scheda "Negozio" invece di lasciare visibile "Rilievi".
+  aggiornaBloccoNegozio();
+  if (!negozioSelezionato()) { try { window.mostra('Giro'); } catch (e) {} }
+
+  /* -------------------------- svuota memoria -------------------------- */
+  // Cancella dalla memoria del telefono (localStorage + foto private
+  // dell'app) tutti i sopralluoghi gia' in elenco tranne quello aperto ora,
+  // cosi' non restano ad occupare spazio negozi gia' esportati e lavorati.
+  async function svuotaMemoria() {
+    var altri = (stato.sessioni || []).filter(function (s) { return s.id !== stato.corrente; });
+    if (!altri.length) { toast('Nessun altro sopralluogo in memoria da cancellare'); return; }
+    var elenco = altri.map(function (s) { return (s.negozio || 'senza nome') + (s.cdc ? ' (' + s.cdc + ')' : ''); }).join('\n· ');
+    var ok = window.confirm('Cancellare dalla memoria del telefono ' + altri.length +
+      ' sopralluogo/i, oltre a quello aperto ora?\n\n· ' + elenco +
+      '\n\nAssicurati di averli gia\' esportati: l\'operazione non si puo\' annullare.');
+    if (!ok) return;
+    for (var i = 0; i < altri.length; i++) {
+      try {
+        await Filesystem.rmdir({ path: 'foto_catturate/' + altri[i].id, directory: DIR_DATA, recursive: true });
+      } catch (e) { /* nessuna foto per questa sessione: cartella assente */ }
+    }
+    stato.sessioni = (stato.sessioni || []).filter(function (s) { return s.id === stato.corrente; });
+    salva();
+    rendiTutto();
+    toast('Cancellati ' + altri.length + ' sopralluogo/i dalla memoria del telefono');
+  }
+  function aggiungiPulsanteSvuota() {
+    var rif = document.getElementById('bNuova');
+    if (!rif || !rif.parentNode || document.getElementById('bSvuotaMemoria')) return;
+    var b = document.createElement('button');
+    b.id = 'bSvuotaMemoria'; b.type = 'button';
+    b.textContent = 'Svuota memoria (negozi gia\' esportati)';
+    b.addEventListener('click', svuotaMemoria);
+    rif.parentNode.insertBefore(b, rif.nextSibling);
+  }
 
   // Nel banner (visibile mentre una finestra foto e' aperta) si aggiunge un
   // pulsante per scattare altre foto sullo stesso punto senza doverlo
@@ -500,5 +635,7 @@
     aggiungiPulsante('bSalva2');
     aggiungiPulsanteBanner();
     aggiungiMicrofono('dNota');
+    aggiungiPulsanteSvuota();
+    aggiornaBloccoNegozio();
   });
 })();
