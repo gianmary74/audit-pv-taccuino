@@ -58,7 +58,7 @@ jobs:
             --notes "APK di debug compilato automaticamente dal commit ${{ github.sha }}." \
             --target ${{ github.sha }}
 
-      - name: Pubblica il log di build in caso di errore (stesso motivo: github.com, non Azure blob)
+      - name: "Pubblica il log di build in caso di errore (stesso motivo: github.com, non Azure blob)"
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
