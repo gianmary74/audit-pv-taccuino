@@ -73,7 +73,18 @@
       per "Rilievo non in elenco". Un tocco, uno scatto, senza aprire
       nessuna scheda: le foto finiscono comunque nel pacchetto esportato
       (prefisso "veloce__" nel nome file, sezione dedicata nel PDF), pronte
-      per essere classificate guardandone il contenuto in lavorazione. */
+      per essere classificate guardandone il contenuto in lavorazione.
+   9. "Rilievo non in elenco" nascosto: il punto 77 della check list copre
+      gia' questo caso, quindi il pulsante originale era ridondante.
+  10. Pulsante "Scarica il pacchetto qui": in piu' rispetto a "Esporta e
+      condividi" (che passa dal foglio di condivisione nativo), salva lo
+      .zip direttamente nella cartella pubblica Documenti/Taccuino_sopral
+      luoghi del telefono, cosi' i pacchetti dei vari negozi si accumulano
+      in un unico posto da cui prenderli tutti insieme a fine campagna. Su
+      Android moderno non si puo' scrivere nella cartella "Download" senza
+      permessi speciali che l'app non chiede: "Documenti" e' la cartella
+      pubblica che Capacitor puo' usare senza chiederne di nuovi, ed e'
+      comunque visibile con qualunque gestore file del telefono. */
 (function () {
   function nativo() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -98,6 +109,9 @@
     // "Esporta per Claude" (pulsante originale del taccuino) e' ridondante
     // col nuovo "Esporta e condividi": il suo JSON e' lo stesso contenuto.
     '#bEsporta{display:none}' +
+    // "Rilievo non in elenco": il punto 77 della check list copre gia'
+    // questo caso, quindi anche questo pulsante e' ridondante.
+    '#bLibera{display:none}' +
     // La scheda "Negozio" (id storico #tabGiro) va per prima: solo ordine
     // visivo (flex order), l'HTML e la logica del taccuino restano quelli
     // di sempre.
@@ -766,60 +780,79 @@
   }
 
   /* --------------------------- esporta e condividi -------------------------------- */
+  // Costruisce html+json+pdf+foto e li impacchetta in uno .zip in memoria.
+  // Usata sia da "Esporta e condividi" (foglio di condivisione nativo) sia
+  // da "Scarica il pacchetto qui" (salvataggio diretto nel telefono): la
+  // parte che genera il contenuto e' la stessa, cambia solo dove finisce.
+  async function costruisciPacchettoZip() {
+    var s = sessione();               // funzione gia' definita da app_modello.html
+    chiudiFoto(false);
+    var nomeBase = nomeCartella(s);
+    var htmlTesto = documentoSalvabile();   // gia' definita: HTML con i dati incorporati
+    var jsonTesto = testoEsporta();         // gia' definita: JSON per la lavorazione
+    var foto = await fotoDellaSessione();
+    var pdfBuf = pdfDaSessione(s, foto);
+
+    var enc = new TextEncoder();
+    var pacchetto = {};
+    pacchetto[nomeBase + '.html'] = enc.encode(htmlTesto);
+    pacchetto[nomeBase + '.json'] = enc.encode(jsonTesto);
+    pacchetto[nomeBase + '.pdf'] = new Uint8Array(pdfBuf);
+    Object.keys(foto).forEach(function (chiave) {
+      foto[chiave].forEach(function (f) {
+        pacchetto['foto/' + f.nomeFile] = base64ToUint8(f.base64);
+      });
+    });
+    var zippato = fflate.zipSync(pacchetto, { level: 6 });
+    var nFoto = Object.keys(foto).reduce(function (a, k) { return a + foto[k].length; }, 0);
+    return { s: s, nomeBase: nomeBase, zippato: zippato, nFoto: nFoto };
+  }
+
   async function esportaECondividi() {
     try {
-      var s = sessione();               // funzione gia' definita da app_modello.html
-      chiudiFoto(false);
-      var nomeBase = nomeCartella(s);
-      var cartella = 'sopralluoghi/' + nomeBase;
-      var htmlTesto = documentoSalvabile();   // gia' definita: HTML con i dati incorporati
-      var jsonTesto = testoEsporta();         // gia' definita: JSON per la lavorazione
-      var foto = await fotoDellaSessione();
-
-      async function scrivi(nomeFile, dataStr) {
-        await Filesystem.writeFile({
-          path: cartella + '/' + nomeFile, data: dataStr,
-          directory: DIR_CACHE, recursive: true, encoding: 'utf8'
-        });
-      }
-      async function scriviBinario(nomeFile, base64) {
-        await Filesystem.writeFile({
-          path: cartella + '/' + nomeFile, data: base64,
-          directory: DIR_CACHE, recursive: true
-        });
-      }
-
-      await scrivi(nomeBase + '.html', htmlTesto);
-      await scrivi(nomeBase + '.json', jsonTesto);
-      var pdfBuf = pdfDaSessione(s, foto);
-      await scriviBinario(nomeBase + '.pdf', arrayBufferToBase64(pdfBuf));
-
-      var enc = new TextEncoder();
-      var pacchetto = {};
-      pacchetto[nomeBase + '.html'] = enc.encode(htmlTesto);
-      pacchetto[nomeBase + '.json'] = enc.encode(jsonTesto);
-      pacchetto[nomeBase + '.pdf'] = new Uint8Array(pdfBuf);
-      Object.keys(foto).forEach(function (chiave) {
-        foto[chiave].forEach(function (f) {
-          pacchetto['foto/' + f.nomeFile] = base64ToUint8(f.base64);
-        });
+      var p = await costruisciPacchettoZip();
+      var cartella = 'sopralluoghi/' + p.nomeBase;
+      await Filesystem.writeFile({
+        path: cartella + '/' + p.nomeBase + '.zip', data: uint8ToBase64(p.zippato),
+        directory: DIR_CACHE, recursive: true
       });
-      var zippato = fflate.zipSync(pacchetto, { level: 6 });
-      await scriviBinario(nomeBase + '.zip', uint8ToBase64(zippato));
+      var uriZip = (await Filesystem.getUri({ path: cartella + '/' + p.nomeBase + '.zip', directory: DIR_CACHE })).uri;
 
-      var uriZip = (await Filesystem.getUri({ path: cartella + '/' + nomeBase + '.zip', directory: DIR_CACHE })).uri;
-
-      var nFoto = Object.keys(foto).reduce(function (a, k) { return a + foto[k].length; }, 0);
-      toast('Salvato: ' + nomeBase + '.zip (html, json, pdf' + (nFoto ? ', ' + nFoto + ' foto' : '') + ')');
+      toast('Pronto: ' + p.nomeBase + '.zip (html, json, pdf' + (p.nFoto ? ', ' + p.nFoto + ' foto' : '') + ')');
       try {
         await Share.share({
-          title: 'Sopralluogo ' + (s.negozio || ''),
-          text: 'Archivio del sopralluogo ' + (s.negozio || '') + (s.cdc ? ' - CDC ' + s.cdc : ''),
+          title: 'Sopralluogo ' + (p.s.negozio || ''),
+          text: 'Archivio del sopralluogo ' + (p.s.negozio || '') + (p.s.cdc ? ' - CDC ' + p.s.cdc : ''),
           url: uriZip
         });
       } catch (e) { /* condivisione annullata: i file restano comunque salvati sul telefono */ }
     } catch (e) {
       toast('Esportazione non riuscita: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  // "Scarica il pacchetto qui": salva lo .zip direttamente in una cartella
+  // pubblica del telefono (non nello spazio privato dell'app, come invece
+  // fa "Esporta e condividi" prima di passarlo al foglio di condivisione),
+  // cosi' i pacchetti dei vari negozi si accumulano in un unico posto da
+  // cui prenderli tutti insieme, senza dover condividere ogni volta.
+  // Nota tecnica: su Android moderno (10+) non e' piu' possibile scrivere
+  // direttamente nella cartella "Download" senza permessi speciali che
+  // l'app non chiede; la cartella pubblica che Capacitor puo' usare senza
+  // permessi aggiuntivi e' "Documenti" (Directory.Documents), visibile
+  // comunque con qualunque gestore file o app "File" del telefono.
+  async function scaricaPacchettoLocale() {
+    try {
+      var p = await costruisciPacchettoZip();
+      var percorso = 'Taccuino_sopralluoghi/' + p.nomeBase + '.zip';
+      await Filesystem.writeFile({
+        path: percorso, data: uint8ToBase64(p.zippato),
+        directory: 'DOCUMENTS', recursive: true
+      });
+      toast('Salvato in Documenti/Taccuino_sopralluoghi/' + p.nomeBase + '.zip' +
+        (p.nFoto ? ' (' + p.nFoto + ' foto)' : ''));
+    } catch (e) {
+      toast('Salvataggio locale non riuscito: ' + (e && e.message ? e.message : e));
     }
   }
 
@@ -833,6 +866,20 @@
     b.style.marginTop = '8px';
     b.addEventListener('click', esportaECondividi);
     rif.parentNode.insertBefore(b, rif.nextSibling);
+
+    var b2 = document.createElement('button');
+    b2.type = 'button';
+    b2.className = rif.className;
+    b2.textContent = 'Scarica il pacchetto qui (Documenti/Taccuino_sopralluoghi)';
+    b2.style.marginTop = '8px';
+    b2.addEventListener('click', async function () {
+      if (b2.disabled) return;
+      var testoOrig = b2.textContent;
+      b2.disabled = true; b2.textContent = 'Salvataggio…';
+      try { await scaricaPacchettoLocale(); }
+      finally { b2.disabled = false; b2.textContent = testoOrig; }
+    });
+    b.parentNode.insertBefore(b2, b.nextSibling);
   }
 
   window.addEventListener('DOMContentLoaded', function () {
