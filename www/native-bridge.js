@@ -38,6 +38,23 @@
   }
   if (!nativo()) return;
 
+  // Corregge due problemi di layout che si vedono solo dentro l'app (non nel
+  // browser): 1) la barra di stato del telefono si sovrappone alla testata e
+  // al banner, che nel browser non esistono; 2) il pulsante "+ Foto" aggiunto
+  // qui sotto al banner, se il banner non va a capo, spinge tutta la pagina
+  // piu' larga dello schermo e taglia il bordo destro di tutto (banner,
+  // scheda del punto, pulsanti). Si inietta un foglio di stile dedicato
+  // invece di toccare le regole del taccuino originale.
+  var stile = document.createElement('style');
+  stile.textContent =
+    'html,body{overflow-x:hidden;max-width:100vw}' +
+    'header.top{padding-top:env(safe-area-inset-top)}' +
+    '.banner{padding-top:env(safe-area-inset-top)}' +
+    '.banner .wrap{flex-wrap:wrap;row-gap:6px}' +
+    '.banner .grow{flex:1 1 100%;min-width:0}' +
+    '.banner button{flex:0 0 auto;padding:7px 10px;font-size:12.5px}';
+  document.head.appendChild(stile);
+
   var Filesystem = window.Capacitor.Plugins.Filesystem;
   var Share = window.Capacitor.Plugins.Share;
   var Camera = window.Capacitor.Plugins.Camera;
@@ -162,9 +179,9 @@
     var rifBottone = document.getElementById('bNota');
     if (!banner || !rifBottone || document.getElementById('bScattaAncora')) return;
     var b = document.createElement('button');
-    b.id = 'bScattaAncora'; b.type = 'button'; b.textContent = 'Scatta ancora';
+    b.id = 'bScattaAncora'; b.type = 'button'; b.textContent = '+ Foto';
     b.addEventListener('click', function () {
-      if (window.attivo) scatta(window.attivo.n, window.attivo.etichetta);
+      if (attivo) scatta(attivo.n, attivo.etichetta);   // "attivo" e' la variabile globale del taccuino (non window.attivo: e' dichiarata con let)
     });
     rifBottone.parentNode.insertBefore(b, rifBottone);
   }
