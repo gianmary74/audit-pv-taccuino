@@ -67,7 +67,13 @@
       legato all'apertura/chiusura della scheda invece che ai tocchi sul
       pulsante. L'array "foto" originale (e quindi l'export JSON/HTML/PDF)
       non viene toccato: il conteggio vero vive in un campo aggiuntivo di
-      "stato" (fotoScattate), salvato insieme al resto. */
+      "stato" (fotoScattate), salvato insieme al resto.
+   8. Pulsante "Foto veloce, senza rilievo": per i sopralluoghi fatti di
+      corsa, quando non c'e' tempo neanche di dettare una descrizione come
+      per "Rilievo non in elenco". Un tocco, uno scatto, senza aprire
+      nessuna scheda: le foto finiscono comunque nel pacchetto esportato
+      (prefisso "veloce__" nel nome file, sezione dedicata nel PDF), pronte
+      per essere classificate guardandone il contenuto in lavorazione. */
 (function () {
   function nativo() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -251,7 +257,13 @@
     s.fotoScattate[chiave] = (s.fotoScattate[chiave] || 0) + 1;
   }
 
-  async function scatta(n, et) {
+  async function scatta(n, et, contestoToast) {
+    // Vale anche per lo scatto veloce (vedi piu' sotto), che non passa da
+    // apriFoto: senza negozio non si scatta comunque, per non attribuire
+    // foto al sopralluogo sbagliato.
+    if (typeof negozioSelezionato === 'function' && !negozioSelezionato()) {
+      toast('Seleziona prima il negozio'); if (typeof window.mostra === 'function') window.mostra('Giro'); return;
+    }
     if (scattoInCorso) { toast('Scatto in corso: attendi un attimo e ritocca'); return; }
     scattoInCorso = true;
     try {
@@ -273,8 +285,9 @@
         incrementaContaFotoNative(n);
         salva();
         rendiTutto();   // aggiorna subito il numero di foto sulla piastrella
-        toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero') +
-          ' (' + contaFotoNative(sessione(), n) + ' in questo punto)');
+        var contesto = contestoToast || (n ? ' · punto ' + n : ' · rilievo libero');
+        var etichettaConta = n === 'veloce' ? ' finora' : (n ? ' in questo punto' : ' in questo rilievo libero');
+        toast('Foto acquisita' + contesto + ' (' + contaFotoNative(sessione(), n) + etichettaConta + ')');
       } catch (e) {
         toast('Salvataggio foto non riuscito: ' + (e && e.message ? e.message : e));
       }
@@ -431,6 +444,18 @@
     var spans = conta.querySelectorAll('span');
     if (spans.length < 2) return;
     spans[1].innerHTML = '<b>' + totaleFotoNative(s) + '</b> foto scattate';
+    var veloci = contaFotoNative(s, 'veloce');
+    var spanVeloci = conta.querySelector('#contaVeloci');
+    if (veloci > 0) {
+      if (!spanVeloci) {
+        spanVeloci = document.createElement('span');
+        spanVeloci.id = 'contaVeloci';
+        conta.appendChild(spanVeloci);
+      }
+      spanVeloci.innerHTML = '<b>' + veloci + '</b> veloci da classificare';
+    } else if (spanVeloci) {
+      spanVeloci.remove();
+    }
   }
   function aggiornaFotoPiastrelle() {
     var s = sessione();
@@ -539,6 +564,32 @@
     b.id = 'bSvuotaMemoria'; b.type = 'button';
     b.textContent = 'Svuota memoria (negozi gia\' esportati)';
     b.addEventListener('click', svuotaMemoria);
+    rif.parentNode.insertBefore(b, rif.nextSibling);
+  }
+
+  /* --------------------------- foto veloce, senza rilievo -------------------------- */
+  // Per i sopralluoghi fatti di corsa, quando non c'e' tempo di aprire un
+  // punto o anche solo di dettare una descrizione (a differenza di "Rilievo
+  // non in elenco", che chiede comunque una nota): un tocco, uno scatto,
+  // via. Non apre nessuna scheda ne' finestra (non tocca "attivo"), quindi
+  // non interferisce con un punto eventualmente gia' aperto. Le foto
+  // finiscono comunque nel pacchetto di "Esporta e condividi" (con il
+  // prefisso "veloce__" nel nome file) e in una sezione dedicata del PDF di
+  // sintesi: la scelta di quale rilievo rappresentano si fa dopo, guardando
+  // il contenuto della foto durante la lavorazione della campagna.
+  function aggiungiPulsanteVeloce() {
+    var rif = document.getElementById('bLibera');
+    if (!rif || !rif.parentNode || document.getElementById('bFotoVeloce')) return;
+    var b = document.createElement('button');
+    b.id = 'bFotoVeloce'; b.type = 'button'; b.className = rif.className;
+    b.textContent = 'Foto veloce, senza rilievo (la classifico dopo)';
+    b.addEventListener('click', async function () {
+      if (b.disabled) return;
+      var testoOrig = b.textContent;
+      b.disabled = true; b.textContent = '· · ·';
+      try { await scatta('veloce', '', ' · scatto veloce'); }
+      finally { b.disabled = false; b.textContent = testoOrig; }
+    });
     rif.parentNode.insertBefore(b, rif.nextSibling);
   }
 
@@ -701,6 +752,14 @@
     });
     if (foto['libero'] && foto['libero'].length) immaginiPer('libero');
 
+    if (foto['veloce'] && foto['veloce'].length) {
+      nuovaPaginaSeServe(14);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text('Foto veloci senza rilievo associato (' + foto['veloce'].length +
+        ') — da classificare in lavorazione', 14, y); y += 6;
+      immaginiPer('veloce');
+    }
+
     doc.setFontSize(7.5); doc.setTextColor(140);
     doc.text('Sintesi grezza generata sul telefono. Le foto scattate dall\'app sono incluse qui in miniatura e nello .zip; una copia a piena risoluzione resta anche nella libreria foto del telefono per l\'abbinamento nella lavorazione della campagna.', 14, 289, { maxWidth: 182 });
     return doc.output('arraybuffer');
@@ -782,6 +841,7 @@
     aggiungiPulsanteBanner();
     aggiungiMicrofono('dNota');
     aggiungiPulsanteSvuota();
+    aggiungiPulsanteVeloce();
     aggiornaBloccoNegozio();
   });
 })();
