@@ -21,6 +21,11 @@
       punto: avvia la dettatura vocale nativa (non quella della tastiera,
       che restava comunque disponibile) e aggiunge il testo riconosciuto
       alla nota, utile quando le mani sono sporche o si indossano i guanti.
+      Ogni volta che si riapre la scheda di un punto gia' visto, il campo
+      nota si presenta vuoto: quello che si scrive o si detta si aggiunge
+      (su una riga nuova) a quanto gia' raccolto per quel punto nelle
+      aperture precedenti, invece di sovrascriverlo. La nota finale, quella
+      che finisce nel JSON/HTML/PDF, resta la somma di tutte le aperture.
    3. Pulsante "Esporta e condividi": scrive nella cartella privata dell'app
       tre file per il negozio corrente (HTML di lavoro, JSON di esportazione,
       PDF di sintesi grezza con le miniature delle foto scattate), li
@@ -97,6 +102,56 @@
   window.apriFoto = function (n, et) {
     _apriFoto(n, et);
     scatta(n, et);
+  };
+
+  /* --------- nota "a somma": ogni apertura della scheda parte vuota, --------- */
+  /* --------- quello che si scrive si aggiunge a quanto gia' raccolto -------- */
+  // riga(n) e' la funzione originale che crea/restituisce {r, nota, foto} per
+  // il punto n. Qui, alla prima volta che si incontra un dato punto, si
+  // trasforma la sua proprieta' "nota" in un accumulatore: leggerla restituisce
+  // sempre il testo completo (quello che finisce nel JSON/PDF/HTML, invariato
+  // per lo script di fusione), ma scriverci (cosa che il taccuino originale fa
+  // ogni volta che si chiude la scheda) aggiunge il nuovo testo invece di
+  // sostituire quello vecchio.
+  var _riga = window.riga;
+  window.riga = function (n) {
+    var r = _riga(n);
+    if (!r.__notaSomma) {
+      var interna = { v: r.nota || '' };
+      r.__ultimoTesto = null;   // evita doppie aggiunte se il taccuino scrive
+                                 // due volte lo stesso testo alla chiusura
+      Object.defineProperty(r, 'nota', {
+        enumerable: true, configurable: true,
+        get: function () { return interna.v; },
+        set: function (nuovo) {
+          nuovo = (nuovo || '').trim();
+          if (!nuovo || nuovo === r.__ultimoTesto) return;   // niente di nuovo, o gia' registrato in questa apertura
+          r.__ultimoTesto = nuovo;
+          if (nuovo === interna.v) return;
+          // se il nuovo testo contiene gia' per intero quello vecchio (capita
+          // quando qualcosa nel taccuino riscrive il valore letto dal campo
+          // senza passare dall'apertura vuota) non lo si duplica.
+          if (interna.v && nuovo.indexOf(interna.v) === 0) { interna.v = nuovo; return; }
+          interna.v = interna.v ? (interna.v + '\n' + nuovo) : nuovo;
+        }
+      });
+      Object.defineProperty(r, '__notaSomma', { value: true, enumerable: false });
+    }
+    return r;
+  };
+
+  // apriPunto(n) e' la funzione originale che apre la scheda e vi carica la
+  // nota corrente nel campo di testo. Qui, subito dopo, si svuota il campo e
+  // si azzera il guardiano anti-doppione: il testo raccolto finora resta al
+  // sicuro nell'accumulatore sopra, pronto a ricevere in aggiunta quello che
+  // si scrive in questa nuova apertura.
+  var _apriPunto = window.apriPunto;
+  window.apriPunto = function (n) {
+    _apriPunto(n);
+    var r = window.riga(n);
+    r.__ultimoTesto = null;
+    var ta = document.getElementById('dNota');
+    if (ta) ta.value = '';
   };
 
   // Nel banner (visibile mentre una finestra foto e' aperta) si aggiunge un
