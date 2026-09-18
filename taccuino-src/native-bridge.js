@@ -17,7 +17,11 @@
       salvata nella libreria normale del telefono (saveToGallery), quindi
       resta comunque disponibile per l'abbinamento GPS/orario della skill
       come con qualunque altra foto.
-   2. Pulsante "Esporta e condividi": scrive nella cartella privata dell'app
+   2. Tasto microfono ("Detta nota") accanto al campo nota della scheda
+      punto: avvia la dettatura vocale nativa (non quella della tastiera,
+      che restava comunque disponibile) e aggiunge il testo riconosciuto
+      alla nota, utile quando le mani sono sporche o si indossano i guanti.
+   3. Pulsante "Esporta e condividi": scrive nella cartella privata dell'app
       tre file per il negozio corrente (HTML di lavoro, JSON di esportazione,
       PDF di sintesi grezza con le miniature delle foto scattate), li
       impacchetta in uno .zip e apre il foglio di condivisione nativo di
@@ -32,6 +36,7 @@
   var Filesystem = window.Capacitor.Plugins.Filesystem;
   var Share = window.Capacitor.Plugins.Share;
   var Camera = window.Capacitor.Plugins.Camera;
+  var SpeechRecognition = window.Capacitor.Plugins.SpeechRecognition;
   var DIR_DATA = 'DATA';
   var DIR_CACHE = 'CACHE';
 
@@ -107,6 +112,49 @@
       if (window.attivo) scatta(window.attivo.n, window.attivo.etichetta);
     });
     rifBottone.parentNode.insertBefore(b, rifBottone);
+  }
+
+  /* ----------------------------- nota vocale (microfono) -------------------------- */
+  var inAscolto = false;
+  async function dettaNota(textarea, bottone) {
+    if (inAscolto || !SpeechRecognition) return;
+    try {
+      var perm = await SpeechRecognition.checkPermissions();
+      if (perm.speechRecognition !== 'granted') {
+        perm = await SpeechRecognition.requestPermissions();
+        if (perm.speechRecognition !== 'granted') {
+          toast('Permesso microfono negato'); return;
+        }
+      }
+      inAscolto = true;
+      var testoOrig = bottone.textContent;
+      bottone.textContent = '● In ascolto…';
+      var r = await SpeechRecognition.start({
+        language: 'it-IT', maxResults: 1, partialResults: false, popup: false
+      });
+      bottone.textContent = testoOrig;
+      inAscolto = false;
+      var detto = (r && r.matches && r.matches[0]) ? r.matches[0].trim() : '';
+      if (!detto) { toast('Nessun testo riconosciuto'); return; }
+      var attuale = textarea.value.trim();
+      textarea.value = attuale ? (attuale + ' ' + detto) : detto;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      toast('Nota aggiunta');
+    } catch (e) {
+      inAscolto = false;
+      if (bottone) bottone.textContent = '🎤 Detta nota';
+      toast('Dettatura non riuscita: ' + (e && e.message ? e.message : e));
+    }
+  }
+  function aggiungiMicrofono(idTextarea) {
+    var ta = document.getElementById(idTextarea);
+    if (!ta || !ta.parentNode || !SpeechRecognition) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 'bMic' + idTextarea;
+    b.textContent = '🎤 Detta nota';
+    b.style.marginTop = '8px'; b.style.width = '100%';
+    b.addEventListener('click', function () { dettaNota(ta, b); });
+    ta.parentNode.insertBefore(b, ta.nextSibling);
   }
 
   /* ------------------------------- generazione PDF -------------------------------- */
@@ -271,5 +319,6 @@
     aggiungiPulsante('bSalva');
     aggiungiPulsante('bSalva2');
     aggiungiPulsanteBanner();
+    aggiungiMicrofono('dNota');
   });
 })();
