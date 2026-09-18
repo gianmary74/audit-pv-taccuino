@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#B4530A">
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Taccuino di sopralluogo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --bg:#F7F5F1; --surface:#FFFFFF; --surface2:#F1EEE7;
+  --ink:#1B1A17; --muted:#6C685F; --line:#E2DDD3;
+  --accent:#B4530A; --accent-ink:#FFFFFF;
+  --si:#2E6B3E; --no:#A32020; --na:#6C685F;
+  --shadow:0 1px 2px rgba(27,26,23,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131512; --surface:#1C1F1A; --surface2:#232720;
+    --ink:#ECEAE3; --muted:#9A9689; --line:#2F342C;
+    --accent:#F2A73B; --accent-ink:#1B1A17;
+    --si:#69B37A; --no:#E86A63; --na:#9A9689;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131512; --surface:#1C1F1A; --surface2:#232720;
+  --ink:#ECEAE3; --muted:#9A9689; --line:#2F342C;
+  --accent:#F2A73B; --accent-ink:#1B1A17;
+  --si:#69B37A; --no:#E86A63; --na:#9A9689;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px; line-height:1.45; margin:0; padding-block:0 40px; -webkit-text-size-adjust:100%}
+.wrap{max-width:780px; margin:0 auto; padding-inline:16px}
+h1,.disp{font-family:Oswald,"IBM Plex Sans",system-ui,sans-serif; font-weight:600;
+  letter-spacing:.01em; text-wrap:balance; margin:0}
+.eyebrow{font-family:Oswald,sans-serif; font-size:12px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted)}
+button{font:inherit; color:inherit; cursor:pointer}
+input,textarea,select{font:inherit; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:8px; padding:10px 12px; width:100%}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+header.top{position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line)}
+.top .riga1{display:flex; align-items:baseline; gap:10px; padding-top:10px}
+.top h1{font-size:18px; line-height:1.1; flex:1; min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
+.top .sub{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; flex:none}
+nav.tab{display:flex; gap:4px; padding-top:8px}
+nav.tab button{flex:1; background:none; border:0; border-bottom:2px solid transparent;
+  padding:9px 4px 8px; font-family:Oswald,sans-serif; font-size:14px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted)}
+nav.tab button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+
+.banner{position:sticky; top:0; z-index:25; background:var(--accent); color:var(--accent-ink)}
+.banner .wrap{display:flex; align-items:center; gap:10px; padding-block:9px}
+.banner .grow{flex:1; min-width:0}
+.banner b{font-family:Oswald,sans-serif; font-weight:600; display:block;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.banner small{display:block; font-size:12px; opacity:.85}
+.banner button{background:var(--accent-ink); color:var(--accent); border:0; border-radius:6px;
+  padding:8px 12px; font-family:Oswald,sans-serif; letter-spacing:.04em; flex:none}
+
+.vista{display:none}
+.vista[data-on="1"]{display:block}
+
+.cerca{margin:14px 0 4px}
+.conta{display:flex; gap:14px; font-size:13px; color:var(--muted); padding:4px 2px 6px;
+  font-variant-numeric:tabular-nums}
+.conta b{color:var(--ink); font-weight:600}
+
+.zona{margin-top:16px}
+.zona>.eyebrow{padding-bottom:8px}
+.griglia{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+.piastrella{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  min-height:86px; text-align:left; display:flex; flex-direction:column;
+  justify-content:space-between; box-shadow:var(--shadow); line-height:1.25; overflow:hidden}
+.piastrella .scatta{flex:1; width:100%; text-align:left; background:none; border:0;
+  padding:12px 12px 6px}
+.piastrella .et{font-size:14.5px; font-weight:500}
+.piastrella .pie{padding:0 10px 9px}
+.piastrella .scheda-apri{margin-left:auto; background:var(--surface2); border:1px solid var(--line);
+  border-radius:999px; padding:3px 9px; font-family:Oswald,sans-serif; font-size:11px;
+  letter-spacing:.06em; color:var(--muted)}
+.piastrella .pie{display:flex; align-items:center; gap:6px; font-family:Oswald,sans-serif;
+  font-size:11.5px; letter-spacing:.06em; color:var(--muted)}
+.piastrella .pie .tag{padding:2px 6px; border-radius:999px; border:1px solid var(--line)}
+.piastrella[data-segnato="1"]{border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.piastrella[data-segnato="1"] .pie{color:var(--accent)}
+.piastrella[data-attivo="1"]{outline:2px solid var(--accent); outline-offset:1px}
+.libera{margin-top:14px; width:100%; background:var(--ink); color:var(--bg); border:0;
+  border-radius:12px; padding:16px; font-family:Oswald,sans-serif; font-size:15px;
+  letter-spacing:.06em; text-transform:uppercase}
+.libera.salva{margin-top:10px; background:var(--accent); color:var(--accent-ink)}
+
+.punto{display:flex; gap:11px; align-items:flex-start; padding:11px 2px;
+  border-bottom:1px solid var(--line); width:100%; background:none; border-left:0;
+  border-right:0; border-top:0; text-align:left}
+.punto .num{font-family:Oswald,sans-serif; font-size:13px; min-width:26px; height:26px;
+  display:grid; place-items:center; border-radius:6px; background:var(--surface2);
+  color:var(--muted); font-variant-numeric:tabular-nums; flex:none}
+.punto .txt{flex:1; min-width:0; font-size:15px}
+.punto .txt .nota{display:block; font-size:13px; color:var(--muted); margin-top:3px; font-style:italic}
+.punto .txt .foto{display:inline-block; font-size:12px; color:var(--accent);
+  font-family:Oswald,sans-serif; letter-spacing:.04em; margin-top:3px}
+.punto .stato{flex:none; font-family:Oswald,sans-serif; font-size:12px; letter-spacing:.06em;
+  padding:3px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted)}
+.punto[data-r="SI"] .num{background:color-mix(in srgb,var(--si) 18%,transparent); color:var(--si)}
+.punto[data-r="NO"] .num{background:color-mix(in srgb,var(--no) 18%,transparent); color:var(--no)}
+.punto[data-r="SI"] .stato{color:var(--si); border-color:color-mix(in srgb,var(--si) 45%,var(--line))}
+.punto[data-r="NO"] .stato{color:var(--no); border-color:color-mix(in srgb,var(--no) 45%,var(--line))}
+.gruppo{margin-top:18px}
+.gruppo>.eyebrow{padding-bottom:6px; border-bottom:1px solid var(--line)}
+
+.pannello{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:14px; margin-top:14px; box-shadow:var(--shadow)}
+.campi{display:grid; grid-template-columns:1fr 110px; gap:10px}
+.campi label{display:block; min-width:0}
+.campi label:nth-child(6),.campi label:nth-child(7){grid-column:1/-1}
+.riga-azioni{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+.riga-azioni button{background:var(--surface2); border:1px solid var(--line);
+  border-radius:8px; padding:11px 14px}
+.riga-azioni button.primario{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+.nota-uso{font-size:13.5px; color:var(--muted); margin-top:12px}
+.nota-uso b{color:var(--ink); font-weight:600}
+
+dialog{border:0; padding:0; background:transparent; width:100%; max-width:100%;
+  position:fixed; inset:auto 0 0 0; margin:0}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.scheda{background:var(--surface); border-radius:14px 14px 0 0; padding:16px;
+  max-width:780px; margin:auto; border-top:3px solid var(--accent)}
+.scheda .q{font-size:15px; margin:6px 0 14px}
+.rispo{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.rispo button{border:1px solid var(--line); background:var(--surface2); border-radius:10px;
+  padding:14px 0; font-family:Oswald,sans-serif; font-size:16px; letter-spacing:.06em}
+.rispo button[aria-pressed="true"][value="SI"]{background:var(--si); color:#fff; border-color:transparent}
+.rispo button[aria-pressed="true"][value="NO"]{background:var(--no); color:#fff; border-color:transparent}
+.rispo button[aria-pressed="true"][value="NA"]{background:var(--na); color:#fff; border-color:transparent}
+.scheda textarea{margin-top:12px; min-height:92px; resize:vertical}
+.scheda .fondo{display:flex; gap:8px; margin-top:12px}
+.scheda .fondo button{flex:1; border-radius:10px; padding:13px 8px; border:1px solid var(--line);
+  background:var(--surface2); font-family:Oswald,sans-serif; letter-spacing:.04em}
+.scheda .fondo button.primario{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+.scheda .meta{font-size:12px; color:var(--muted); margin-top:10px; font-variant-numeric:tabular-nums}
+.esporta textarea{min-height:190px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12px; white-space:pre; overflow-x:auto}
+.vuoto{color:var(--muted); font-size:14px; padding:18px 2px}
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:22px; z-index:40;
+  background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:999px; font-size:14px;
+  max-width:88%; text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="banner" id="banner" hidden>
+  <div class="wrap">
+    <div class="grow">
+      <b id="bannerPunto">—</b>
+      <small id="bannerOra">le foto che scatti ora vanno a questo rilievo</small>
+    </div>
+    <button id="bNota">Nota</button>
+    <button id="bAnnullaFoto">Annulla</button>
+    <button id="bChiudiFoto">Chiudi</button>
+  </div>
+</div>
+
+<header class="top"><div class="wrap">
+  <div class="riga1">
+    <h1 id="tNegozio">Nuovo sopralluogo</h1>
+    <div class="sub" id="tSub"></div>
+  </div>
+  <nav class="tab" role="tablist">
+    <button id="tabRilievi" role="tab" aria-selected="true">Rilievi</button>
+    <button id="tabElenco" role="tab" aria-selected="false">Tutti i punti</button>
+    <button id="tabGiro" role="tab" aria-selected="false">Giro</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+
+  <section class="vista" id="vRilievi" data-on="1">
+    <div class="conta" id="conta"></div>
+    <div id="piastrelle"></div>
+    <button class="libera" id="bLibera">Rilievo non in elenco — scatta e detta</button>
+    <button class="libera salva" id="bSalva">Salva il file di questo negozio</button>
+    <p class="nota-uso">Tocca il rilievo appena lo vedi: la risposta viene segnata e le foto
+      successive gli vengono attribuite. Tocca di nuovo la stessa piastrella per chiudere.</p>
+  </section>
+
+  <section class="vista" id="vElenco">
+    <div class="cerca"><input id="fCerca" placeholder="Cerca fra i 77 punti di verifica" autocomplete="off"></div>
+    <div id="elenco"></div>
+  </section>
+
+  <section class="vista" id="vGiro">
+    <div class="pannello">
+      <div class="eyebrow">Punto vendita</div>
+      <div class="campi" style="margin-top:8px">
+        <label style="grid-column:1/-1"><span class="eyebrow">Regione</span>
+          <select id="fRegione"></select></label>
+        <label style="grid-column:1/-1"><span class="eyebrow">Provincia</span>
+          <select id="fProvincia"></select></label>
+        <label style="grid-column:1/-1"><span class="eyebrow">Negozio in programma</span>
+          <select id="fPV"></select></label>
+        <label><span class="eyebrow">Insegna e citt&agrave;</span>
+          <input id="fNegozio" placeholder="OVS Alghero" autocomplete="off"></label>
+        <label><span class="eyebrow">CDC</span>
+          <input id="fCdc" placeholder="308" inputmode="numeric" autocomplete="off"></label>
+        <label><span class="eyebrow">Data</span><input id="fData" type="date"></label>
+        <label><span class="eyebrow">Sopralluoghi in memoria</span>
+          <select id="fSessioni"></select></label>
+      </div>
+      <div class="riga-azioni">
+        <button id="bSalva2" class="primario">Salva il file</button>
+        <button id="bNuova">Nuovo negozio</button>
+        <button id="bEsporta">Esporta per Claude</button>
+        <button id="bTema">Tema</button>
+      </div>
+      <p class="nota-uso">I dati restano nella memoria del browser di questo telefono:
+        <b>esporta a fine giornata</b>, non a fine settimana.</p>
+    </div>
+  </section>
+
+</main>
+
+<dialog id="dPunto"><form method="dialog" class="scheda">
+  <div class="eyebrow" id="dArg">—</div>
+  <div class="q" id="dQ">—</div>
+  <div class="rispo">
+    <button type="button" value="SI" aria-pressed="false">SI</button>
+    <button type="button" value="NO" aria-pressed="false">NO</button>
+    <button type="button" value="NA" aria-pressed="false">NA</button>
+  </div>
+  <textarea id="dNota" placeholder="Nota — dettala con il microfono della tastiera"></textarea>
+  <div class="fondo">
+    <button type="button" id="dFoto" class="primario">Foto da qui</button>
+    <button type="button" id="dChiudi">Fatto</button>
+  </div>
+  <div class="meta" id="dMeta"></div>
+</form></dialog>
+
+<dialog id="dEsporta"><form method="dialog" class="scheda esporta">
+  <div class="eyebrow">Esporta</div>
+  <div class="q">Copia e incolla nella conversazione con Claude: risposte, note e orari
+    con cui abbinare le foto.</div>
+  <textarea id="eTesto" readonly></textarea>
+  <div class="fondo">
+    <button type="button" id="eCopia" class="primario">Copia</button>
+    <button type="button" id="eScarica">Salva file</button>
+    <button type="button" id="eChiudi">Chiudi</button>
+  </div>
+  <div class="meta" id="eMeta"></div>
+</form></dialog>
+
+<script>
+const PUNTI = [[1,"DOCUMENTAZIONE","Nel PV è presente il DVR (mail direttore/desktop/cartella sicurezza) Indicare la data dell'ultima versione presente nel PV"],[2,"DOCUMENTAZIONE","Presso il PV è disponibile il P.E. ed è correttamente esposto nella bacheca sicurezza di PV"],[3,"DOCUMENTAZIONE","Presso il PV è esposto e chiaramente visibile l'elenco aggiornato delle squadre di emergenza, dei numeri utili / di emergenza (sia interni che esterni)"],[4,"DOCUMENTAZIONE","E' presente e correttamente compilato il Registro delle Manutenzioni Antincendio"],[5,"DOCUMENTAZIONE","Nell'ultimo verbale semestrale della ditta di manutenzione sono formalizzate non conformità importanti quali ad esempio uscite di sicurezza o porte REI inagibili, etc. Se si, indicare quali"],[6,"PIANO EMERGENZA","Il Direttore ha messo a conoscenza i componenti della squadra di emergenza dell’ubicazione dei pulsanti di sgancio degli impianti (energia elettrica, aerazione, impianti di estinzione,…)"],[7,"PIANO EMERGENZA","In presenza di corner di partner con presidio oppure in caso di utilizzo comune di zone specifiche quali ingressi clienti, ricevimento merci, spogliatoi/servizi igienici, ecc. è stato organizzato e formalizzato il coordinamento per le emergenze."],[8,"INCIDENTI SENZA DANNO ALLE PERSONE: Dipendenti/ Clienti / Appaltatori, Trasportatori …","Nel corso dell’ultimo anno si sono verificati incidenti senza danni a persone, che per puro caso non hanno generato nessun infortunio? Se si, descrivere quanto è avvenuto, specificando se il fatto si è ripetuto più volte e se l’anomalia è stata risolta"],[9,"MOVIMENTAZIONE MANUALE DEI CARICHI","Nel magazzino le distanze tra gli scaffali consentono una MMC agevole dei riutilizzami (spazio netto/ luce di almeno 90 cm, considerate le sporgenze di riutilizzami o altro materiale) Se no specificare motivo/FOTO"],[10,"MOVIMENTAZIONE MANUALE DEI CARICHI","I colli più pesanti vengono collocati in basso e quelli meno pesanti in alto come da procedura"],[11,"MOVIMENTAZIONE MANUALE DEI CARICHI","Il posizionamento dei riutilizzami negli scaffali in alto, con uso di scale, avviene sempre in due persone, per consentire a chi sale di tenersi al montante con una mano"],[12,"MOVIMENTAZIONE MANUALE DEI CARICHI","In caso di colli particolarmente pesanti (oltre i 12/15 kg), la merce contenuta viene divisa in più colli prima della MMC, come da procedura"],[13,"MOVIMENTAZIONE MANUALE DEI CARICHI","All'arrivo dei pallet/roll in riserva, i singoli colli, prima della lavorazione, vengono collocati su apposito piano di lavoro (tavolo/pianella) ad altezza ergonomica"],[14,"MOVIMENTAZIONE MANUALE DEI CARICHI","In assenza del magazziniere gli addetti vendita possono sostituirlo nel carico scarico merci Se SI indicare nelle note quante volte/mese può accadere"],[15,"MOVIMENTAZIONE MANUALE DEI CARICHI","Nel caso gli AV sostituiscano il magazziniere nello scarico merci, gli stessi sono dotati dei relativi DPI con particolare riferimento alla movimentazione dei transpallet"],[16,"MOVIMENTAZIONE MANUALE DEI CARICHI - PALLET IN ARRIVO DA PIATTAFORMA OVS","I pallet arrivano in buono stato, sono stabili senza presentare punti di rottura o crepe pericolose, non contengono carichi sporgenti o precari a rischio di caduta Sono fasciati e reggettati ove necessario Se NO specificare se, come da procedura, gli stessi non vengono scaricati dal camion aziendale e rimandati al mittente"],[17,"MOVIMENTAZIONE MANUALE DEI CARICHI - ROLL IN ARRIVO DA PIATTAFORMA OVS","I roll sono stabili e gli oggetti più pesanti sono caricati nella parte inferiore Non contengono carichi sporgenti o precari a rischio di caduta. I riutilizzami non possono sporgere oltre l’altezza massima delle griglie laterali del rollcontainer (180 cm) Se NO specificare se, come da procedura, gli stessi non vengono scaricati dal camion aziendale e rimandati al mittente"],[18,"GESTIONE PALLET E ROLL DANNEGGIATI","Nel caso in cui arrivino pallet o roll dannegiati o caricati in modo improprio, gli stessi non vengono scaricati dal camion ma restituiti al deposito"],[19,"ROLL E TRANSPALLET UTILIZZATI IN NEGOZIO PER LA MOVIMENTAZIONE INTERNA DELLE MERCI","Nel PV sono presenti roll o pallet rotti e/o caricati in modo improprio Se SI specificare dove sono posizionati"],[20,"SMONTAGGIO ROLL","Oltre al magazziniere, altri possono occuparsi dell'attività di smontaggio roll quando devono essere restituiti al Deposito Se SI', indicare nelle note quale mansione (addette vendita , visual, direttore) e quante volte/mese può accadere"],[21,"SMONTAGGIO ROLL","Chi effettua l'operazione di smontaggio roll indossa DPI (guanti, scarpe)"],[22,"NUOVA RISERVA ESTERNA","E' presente una riserva esterna Se SI compilare foglio 2 SOLO IN CASO DI NUOVA APERTURA/ NUOVO SPAZIO"],[23,"PERCORSI INTERNI/ESTERNI Vendita Riserva interna ed esterna","Lungo tutti i percorsi di transito e trasporto merci con transpallet, roll o altri carrelli, ci sono condizioni che rendono la movimentazione merci con attrezzature difficoltosa (grate, gradini, buche, etc.) Se SI' specificare quali sono + FOTO"],[24,"ZONA RIBALTA DI CARICO SCARICO CAMION","Nel caso in cui sia presente una RIBALTA DI CARICO/SCARICO RIALZATA, la zona ai lati della bocca di carico è protetta con apposito parapetto e, in caso di assenza camion, la stessa zona è protetta contro la caduta Se NO specificare se la zona è di pertinenza OVS oppure indicare il nominativo della società di gestione cui rivolgersi per la messa a norma"],[25,"ZONA RIBALTA DI CARICO SCARICO CAMION RIBALTA MOTORIZZATA","Nel caso in cui sia presente una RIBALTA DI CARICO/SCARICO MOTORIZZATA, la stessa è in buono stato di manutenzione ed protetta lateralmente contro il cesoiamento dei piedi Farla sollevare e verificare la presenza delle apposite velette di protezione in lamiera Se NO specificare se l'attrezzatura è di pertinenza OVS oppure indicare il nominativo della società di gestione cui rivolgersi per la messa a norma"],[26,"SEGNALETICA EMERGENZA Vendita Riserva interna","La segnaletica di emergenza è presente, idonea, correttamente posizionata e visibile da tutti all’interno del punto vendita, senza impedimenti dati da elementi fissi, merci stoccate o altri elementi \"mobili\" Specificare la criticità + FOTO CON VISIONE CONTESTUALIZZATA"],[27,"PLANIMETRIE EMERGENZA FORMATI STANDARD Vendita Riserva interna","Sono presenti planimetrie di emergenza aggiornate in tutti i locali di vendita e riserva (Solo per PV formato \"standard\" quindi esclusi Croff, BK, Kids, Stefanel, Gap)"],[28,"VIE DI FUGA Vendita Riserva interna","Le vie di fuga sono agibili e senza impedimenti. Se NO specificare ingombri presenti FOTO"],[29,"VIE DI FUGA Vendita Riserva interna","Le vie di fuga sono di larghezza almeno pari a 90 cm (al netto degli ingombri) Se NO indicare la larghezza FOTO"],[30,"VIE DI FUGA Vendita Riserva interna","Se PV KIDS, BK, CROFF, Stefanel, GAP (o comunque piccoli formati minori di 400 MQ), le vie di fuga non superano mai 30 m (senza rilevazione fumi) o 45 m (con rilevazione fumi o con altezza > 5 m)"],[31,"USCITE DI SICUREZZA Vendita Riserva interna","le uscite di sicurezza sono in buono stato di manutenzione, si aprono regolarmente e NON sono chiuse a chiave"],[32,"USCITE DI SICUREZZA Vendita Riserva interna","le uscite di sicurezza sono agibili e senza impedimenti Se NO specificare ingombri presenti FOTO"],[33,"PORTE REI Vendita Riserva interna","Le porte REI funzionano regolarmente e non sono danneggiate"],[34,"PORTE REI Vendita Riserva interna","Le porte REI non sono mantenute bloccate (aperte o chiuse) con oggetti o altri sistemi di trattenuta"],[35,"PRESIDI ANTINCENDIO Vendita Riserva interna","I presidi antincendio presenti sono di tipo adeguato, correttamente posizionati anche rispetto alle planimetrie esposte, adeguatamente segnalati e controllati ogni sei mesi dalla ditta di manutenzione"],[36,"PRESIDI ANTINCENDIO Vendita Riserva interna","I presidi antincendio presenti sono immediatamente fruibili"],[37,"ILLUMINAZIONE DI EMERGENZA Vendita Riserva interna","L’illuminazione di emergenza è presente sia nelle aree di vendita che nelle aree scorta merci/riserva/magazzino. (Chiedere al Direttore se funzionante)"],[38,"PROVA DI EVACUAZIONE","E' stata effettuata e registrata la Prova di evacuazione con apposito verbale. Indicare la data dell'ultima prova documentata."],[39,"SPRINKLER Vendita Riserva interna","Gli sprinkler sono, per quanto rilevabile visivamente, in buono stato e liberi da impedimenti. (Distanza minima tra testina e merci 50 cm). Fare FOTO"],[40,"LOCALI NON IDONEI ALLO STOCCAGGIO Vendita Riserva interna","Sono presenti locali / zone / ripostigli / locali angusti e stretti o altre aree stoccaggio di merci, particolarmente ingombre di merce il cui uso appare IMPROPRIO E A RISCHIO ai fini antincendio. Fare FOTO e indicare FATTISPECIE e posizione"],[41,"SCAFFALATURE Vendita Riserva","Gli scaffali sono ben fissati, stabili e in buono stato di manutenzione (non danneggiati)"],[42,"SCAFFALATURE Vendita Riserva","Tutti gli scaffali presentano montanti coperti con appositi tappi di plastica di protezione Se NO fare FOTO"],[43,"SCAFFALATURE Vendita Riserva","I carichi sono stoccati in modo corretto e non presentano rischi di caduta e/o di urti a persone Se NO fare FOTO"],[44,"SCAFFALATURE Vendita Riserva","Non sono presenti carichi stoccati al di sopra del \"coperchio parapolvere\" posizionato a protezione dell'ultimo scaffale Se NO fare FOTO"],[45,"SCAFFALATURE Vendita Riserva","E' rispettata in generale la procedura aziendale che prevede che gli appesi siano collocati in alto e gli stesi in basso per facilitare la MMC. Se NO, in accordo con il direttore/magazziniere, indicarne la fattibilità oppure specificare le motivazioni per cui tale procedura non può essere applicata"],[46,"STUFETTE ELETTRICHE","Sono presenti stufette elettriche (non consentito l'utilizzo)"],[47,"MOBILI E COMPONENTI D'ARREDO Vendita Riserva interna","I mobili, gli espositori ed in generale gli elementi d’arredo risultano, da un esame visivo e da informazioni fornite dal Direttore, in corretto stato di manutenzione (non danneggiati), stabili e correttamente fissati"],[48,"PORTE VETRATE E FINESTRE Vendita Riserva interna","Tutte le strutture, porte, portoni, vetrate, … si presentano in corretto stato senza evidenti anomalie (sentire il Direttore e verificare che non presentino visivamente danneggiamenti e di funzionamento)"],[49,"ELEMENTI FISSI SPORGENTI Vendita Riserva interna","Sono presenti elementi fissi sporgenti dalle pareti o strutture a soffitto ad altezze inferiori a due metri che possono costituire rischio di urto da parte del personale (anche per eventuale riserva esterna) Nel caso in cui siano presenti indicare se sono protetti e segnalati adeguatamente + FOTO"],[50,"INTONACI E CONTROSOFFITTI","Sono presenti criticità relative a controsoffittature, intonaco o altri elementi in quota (anche per eventuale riserva esterna) NOTA - Verificare che tali elementi da un esame visivo non risultino danneggiati e con evidente rischio di caduta, fessurazione, crepe, …"],[51,"CABINE ELETTRICA DI TRASFORMAZIONE Vedi foglio 8","Se presente Cabina Elettrica, è conosciuta ed applicata la procedura che prevede: 1 presenza di una apposita cassetta metallica apribile con codice, contenente la chiave di accesso alla cabina. 2 il codice è conosciuto solo dal Responsabile della Ditta esterna 3 il Direttore ha a disposizione in cassaforte una busta sigillata contenente il codice NOTA: in caso di NO specificare le problematiche ricontrate"],[52,"CABINE ELETTRICA DI TRASFORMAZIONE","Il locale è chiuso a chiave, è presente idonea cartellonistica di Divieto di Accesso, Rischio Elettrico, Divieto di utilizzo acqua"],[53,"LOCALI TECNICi (Quadri elettrici, Caldaia, antincendio, locali tec ascensori, montacarichi, Aree UTA, …)","Tutti locali sono chiusi a chiave, liberi da merci"],[54,"LOCALI TECNICi (Quadri elettrici, Caldaia, antincendio, locali tec ascensori, montacarichi, Aree UTA, …)","Tutti locali presentano idonea cartellonistica NOTA Per cabine di MT/BT: Divieto di Accesso, Rischio Elettrico, Divieto di utilizzo acqua Per locali caldaia: Divieto di Accesso, Presenza gas, Divieto di utilizzo di fiamme libere, Divieto di utilizzo acqua Per locali pompe/gruppi elettrogeni: Divieto di Accesso, Rischio elettrico, Rischio organi in movimento, Rischio Rumore, Divieto di utilizzo di fiamme libere, Divieto di utilizzo acqua Per locale macchine ascensore: Divieto di Accesso (eventuale altra segnaletica specifica come ad esempio presenza di parti in movimento o rischio di caduta potrebbe essere presente in base al tipo di locale/impianto)."],[55,"QUADRI ELETTRICI","Tutti i quadri elettrici hanno sportelli integri, chiusi, con adeguata segnaletica (Rischio elettrocuzione, divieto di spegnere incendi con acqua e divieto di accesso sui quadri elettrici) e liberi da materiale infiammabile (almeno 1 metro in ogni direzione) Se NO fare FOTO"],[56,"SCALE PORTATILI","Le scale portatili utilizzate dal personale sono a norma, idonee all'utilizzo (si riesce ad arrivare alle altezze di carico?) e in buono stato di manutenzione"],[57,"SCALE PORTATILI","se sono presenti scale sopra i 2 metri verificare se è applicata la specifica procedura per l'uso (formazione aggiuntiva, sorveglianza sanitaria, cartello di divieto all'uso per non addetti)"],[58,"CORNICI COMMERCIALI","Tutte le cornici commerciali (in legno o metallo) presenti ed esposte sopra gli scaffali, risultano ancorate alla mensola con l'apposito sistema di trattenuta inviato dalla Sede"],[59,"MONTACARICHI Vendita Riserva interna ed esterna","Se presente montacarichi con pulsantiera interna risulta in corretto stato di manutenzione ed è previsto un sistema di allarme e/o comunicazione con l'esterno e con fotocellule funzionanti NOTA - Specificare anomalie riscontrate e se le fotocellule sono puntiformi o di tipo continuo. In caso di anomalie specificare se l'attrezzatura è di pertinenza OVS oppure indicare il nominativo della società di gestione cui rivolgersi per la messa a norma"],[60,"ASCENSORI / MONTACARICHI Vendita Riserva interna ed esterna","E' presente a tutti i piani il cartello indicante il divieto di utilizzo in caso di incendio"],[61,"Riserve prive di montacarichi/ascensore Vedi foglio 5","Filiale priva di ascensore/montacarichi con riserve situate a piani diversi rispetto alla vendita. In considerazione dei rischi di caduta nella movimentazione manuale dei carichi lungo le scale fisse (visuale ridotta, entrambe le mani occupate, …) verificare l'idoneità della scala fissa con particolare riferimento a:"],[62,"","Sono presenti i cartelli (procedura scala fissa negozi senza ascensori/montacarichi) all’inizio della Salita e all’inizio della Discesa"],[63,"","La procedura è rispettata In caso di no, per quale motivo"],[64,"","La scala è adeguata Se presenta altri problemi indicare quali (strisce non presenti o usurate, corrimano, pendenze elevate, materiale depositato su gradini, altro….)"],[65,"","Secondo te e il tecnico (ove presente), ci potrebbe essere la possibilità di installare un montacarichi o qualche altra attrezzatura motorizzata per poter trasportare colli interi (a prescindere da quello che potrebbe essere il costo dell’installazione)"],[66,"ZONA ATTREZZATURE","Indicare dove vengono conservate le attrezzature (riserva, locale dedicato, altro) Fare foto"],[67,"ZONA ATTREZZATURE","La zona di stoccaggio attrezzature è ordinata e pulita senza rischio di caduta gravi Segnalare eventuali anomalie presenti"],[68,"PEDANE SOLLEVATRICI A PANTOGRAFO O SIMILI","Se presente la pedana/piattaforma di sollevamento (tipicamente a pantografo) risulta in corretto stato di manutenzione ed è dotata di protezioni previste (e le stesse sono funzionanti), in particolare contro il rischio cesoiamento nella parte sottostante (fare prova). E' presente indicazione di portata massima. Barra o dispositivo anticesoiamento; Parapetti e cancelletti con relativi microswitch su eventuali lati aperti. Gli utilizzatori hanno effettuato l'apposita formazione."],[69,"TRANSPALLET MANUALI","I transpallet manuali sono usati esclusivamente dal magazziniere In caso di NO, indicare nelle note chi li usa e verificare utilizzo scarpe antinfortunistica."],[70,"TRANSPALLET / CARRELLI ELETTRICI / SOLLEVATORI IDRAULICI","I transpallet elettrici/CARRELLI ELETTRICI/sollevatori idraulici sono usati esclusivamente da dipendenti formati (vedi foglio 4) In caso di NO, indicare chi li usa."],[71,"TRANSPALLET / CARRELLI ELETTRICI","Viene regolarmente effettuata la manutenzione"],[72,"LOCALI CARICA BATTERIE AL LITIO PER TRANSPALLET / CARRELLI ELETTRICI","Le aree adibite alla carica delle batterie al litio sono: 1) Libere da materiali combustibili o infiammabili per almeno 1 metro in tutte le direzioni; 2) dotate di un impianto automatico di estinzione ad acqua (es. sprinkler) 3) correttamente segnalate (delimitazione area a terra, cartelli di pericolo, cartelli informativi per il personale)"],[73,"ACCESSO IN LUOGHI CON RISCHIO CADUTA DALL'ALTO","In caso siano presenti aree o zone con accesso in quota (es. tetti, locali tecnici particolari), sono stati previsti sistemi per garantire l'accesso ed il lavoro in sicurezza (parapetto, scala, sistemi di ancoraggio ecc) Nel caso in cui la zona non sia protetta specificare al Direttore il DIVIETO DI ACCESSO da parte sia dei dipendenti che degli appaltatori, fino alla messa a norma"],[74,"Fibre Artificiali Vetrose (lana di roccia, fibra di vetro, fibra ceramica refrattaria)","Durante l sopralluogo sono state rilevate Fibre Artificiali Vetrose? Se SI fare FOTO, specificare nelle note il luogo e lo stato di manutenzione"],[75,"SORVEGLIANZA SANITARIA","Nel caso in cui il direttore dichiari che nel PV sono presenti certificati di idoneità con limitazioni prodotti dal MC, la stessa è stata applicata ed è sotto controllo"],[76,"ULTERIORI NOTE","Sono presenti situazioni critiche ulteriori rispetto ai punti sopra indicati (di tipo tecnico, organizzativo, formativo, comportamentale, …) Se si, specificare"],[77,"ULTERIORI NOTE","Sono presenti situazioni critiche ulteriori rispetto ai punti sopra indicati (di tipo tecnico, organizzativo, formativo, comportamentale, …) Se si, specificare"]];
+const RILIEVI = [["Vie di fuga ingombre",28,"NO","Antincendio ed esodo"],["Uscita di sicurezza bloccata",32,"NO","Antincendio ed esodo"],["Porta REI guasta o danneggiata",33,"NO","Antincendio ed esodo"],["Porta REI tenuta aperta",34,"NO","Antincendio ed esodo"],["Estintore: posizione, staffa, cartello",35,"NO","Antincendio ed esodo"],["Presidio non raggiungibile",36,"NO","Antincendio ed esodo"],["Illuminazione di emergenza",37,"NO","Antincendio ed esodo"],["Sprinkler ostruiti",39,"NO","Antincendio ed esodo"],["Segnaletica di emergenza",26,"NO","Antincendio ed esodo"],["Planimetrie di emergenza",27,"NO","Antincendio ed esodo"],["Registro manutenzioni antincendio",4,"NO","Documenti"],["Verbale ditta con non conformità",5,"SI","Documenti"],["DVR",1,"NO","Documenti"],["Piano di emergenza esposto",2,"NO","Documenti"],["Prova di evacuazione",38,"NO","Documenti"],["Carichi stoccati male, rischio caduta",43,"NO","Stoccaggio"],["Locali non idonei allo stoccaggio",40,"SI","Stoccaggio"],["Scaffali danneggiati o non fissati",41,"NO","Stoccaggio"],["Appesi e stesi fuori procedura",45,"NO","Stoccaggio"],["Roll o pallet danneggiati",17,"NO","Stoccaggio"],["Locale tecnico ingombro o aperto",53,"NO","Locali tecnici ed elettrico"],["Cartellonistica locali tecnici",54,"NO","Locali tecnici ed elettrico"],["Quadro elettrico: sportelli e segnaletica",55,"NO","Locali tecnici ed elettrico"],["Impianto elettrico: prese, cavi",77,"SI","Locali tecnici ed elettrico"],["Cabina elettrica",52,"NO","Locali tecnici ed elettrico"],["Intonaci e controsoffitti",50,"SI","Immobile"],["Pavimentazione dei percorsi",23,"SI","Immobile"],["Porte vetrate e strutture",48,"NO","Immobile"],["Elementi fissi sporgenti",49,"SI","Immobile"],["Zona attrezzature: dove sono",66,"","Attrezzature e movimentazione"],["Stoccaggio attrezzature disordinato",67,"NO","Attrezzature e movimentazione"],["Scale portatili",56,"NO","Attrezzature e movimentazione"],["Accesso in quota non protetto",73,"NO","Attrezzature e movimentazione"],["Transpallet e carica batterie",72,"NO","Attrezzature e movimentazione"],["Montacarichi",59,"NO","Attrezzature e movimentazione"],["Spogliatoi e locali del personale",76,"SI","Altro"],["Altra criticità tecnica",77,"SI","Altro"]];   // [etichetta, punto, esito, zona]
+const NEGOZI = [["Basilicata","MT","OVS Matera","353","2026-05-25","SI"],["Basilicata","MT","UPIM Matera","3873","2026-05-25","SI"],["Basilicata","PZ","OVS Melfi","1375","2026-06-08","SI"],["Basilicata","PZ","OVS Potenza","1262","2026-06-08","SI"],["Basilicata","PZ","UPIM Tito","3838","2026-06-08","SI"],["Calabria","CS","OVS Cosenza","280","",""],["Calabria","CS","OVS KIDS Rende Kids","103","",""],["Calabria","CS","OVS Rende","1554","",""],["Calabria","CS","UPIM Belvedere","3861","",""],["Calabria","CZ","OVS Lamezia Due Mari","2392","",""],["Calabria","CZ","UPIM Catanzaro Fiore","3125","",""],["Calabria","RC","OVS Reggio Calabria","279","",""],["Calabria","RC","OVS Reggio Calabria Porto Bolaro","217","",""],["Calabria","RC","OVS Villa San Giovanni","1750","",""],["Calabria","RC","UPIM Reggio Calabria","3862\n1587","",""],["Calabria","RC","UPIM Reggio Calabria","7322","",""],["Calabria","VV","OVS Vibo Center","4941","",""],["Campania","AV","OVS Atripalda","1089","",""],["Campania","AV","OVS Mercogliano","2320","",""],["Campania","AV","UPIM Avellino","928","",""],["Campania","BN","OVS Benevento Buonvento","9067","",""],["Campania","BN","OVS Benevento Cretarossa","1668","",""],["Campania","BN","OVS Montesarchio","2183","",""],["Campania","CE","OVS Caserta","287","",""],["Campania","CE","OVS Marcianise","2334","",""],["Campania","CE","OVS Trentola Ducenta","5483","",""],["Campania","NA","OVS Afragola","1659","",""],["Campania","NA","OVS Anacapri","117","",""],["Campania","NA","OVS Arzano","1527","",""],["Campania","NA","OVS Casoria","9069","",""],["Campania","NA","OVS Ercolano","2352","",""],["Campania","NA","OVS Giugliano in Campania","5472","",""],["Campania","NA","OVS HOLIDAYS Anacapri Holidays","105","",""],["Campania","NA","OVS KIDS Capri Kids","258","",""],["Campania","NA","OVS KIDS Marano Kids","274","",""],["Campania","NA","OVS Mugnano rid Auchan","5473","",""],["Campania","NA","OVS Napoli Argine","5320","",""],["Campania","NA","OVS Napoli C.C. Azzurro (ex C.C. San Paolo)","4757","",""],["Campania","NA","OVS Napoli Colli Aminei","173","",""],["Campania","NA","OVS Napoli Corso Malta","2336","",""],["Campania","NA","OVS Napoli Matteotti","4758","",""],["Campania","NA","OVS Napoli Scarlatti","5323","",""],["Campania","NA","OVS Napoli Stazione","2130","",""],["Campania","NA","OVS Napoli Volla","4823","",""],["Campania","NA","OVS Pompei","9063","",""],["Campania","NA","OVS Portici","1264","",""],["Campania","NA","OVS Torre Annunziata","2141","",""],["Campania","NA","SHAKA Napoli Chiaia Shaka","936","",""],["Campania","NA","STEFANEL Capri Stefanel","9152","",""],["Campania","NA","STEFANEL Sorrento Stefanel","9518","",""],["Campania","NA","UPIM Giugliano in Campania","8849","",""],["Campania","NA","UPIM Napoli Fuorigrotta","9888","",""],["Campania","NA","UPIM Napoli Nisco","3134","",""],["Campania","SA","OVS Cava dei Tirreni","62","",""],["Campania","SA","OVS Eboli","1961","",""],["Campania","SA","OVS Nocera Inferiore","2335","",""],["Campania","SA","OVS Pagani C.C. Pegaso","4940","",""],["Campania","SA","OVS Pontecagnano","1962","",""],["Campania","SA","OVS Salerno 1","1517","",""],["Campania","SA","OVS Salerno Le Cotoniere","2360","",""],["Marche","AN","OVS Jesi","79","2026-07-30","SI"],["Marche","AN","OVS Osimo","364","2026-07-30","SI"],["Marche","AN","OVS Senigallia","129","2026-07-30","SI"],["Marche","AN","UPIM BK Osimo Bk","433","2026-07-30","SI"],["Marche","AN","UPIM Jesi","3835","2026-07-30","SI"],["Marche","AP","OVS Ascoli Piceno","670","2026-07-27","SI"],["Marche","AP","OVS Porto San Giorgio","1085","2026-07-27","SI"],["Marche","AP","OVS San Benedetto","2182","2026-07-27","SI"],["Marche","AP","UPIM BK Grottammare Bk","9620","2026-07-27","SI"],["Marche","FM","OVS Fermo","3289","2026-07-27","SI"],["Marche","FM","UPIM Porto Sant'Elpidio","3782","2026-07-28","SI"],["Marche","MC","OVS Corridonia","2345","2026-07-29","SI"],["Marche","MC","UPIM Piediripa Macerata","8854","2026-07-29","SI"],["Marche","MC","UPIM Tolentino","3866","2026-07-29","SI"],["Marche","MC","UPIM Matelica","3844","2026-07-30","SI"],["Marche","PU","OVS Fano C.C. Auchan","4760","",""],["Marche","PU","OVS Pesaro","223","",""],["Marche","PU","UPIM BK Fano Bk","7761","",""],["Marche","PU","UPIM CROFF Pesaro Croff","9623","",""],["Puglia","BA","OVS Locorotondo","1960","2026-04-27","SI"],["Puglia","BA","OVS Monopoli","2180","2026-04-27","SI"],["Puglia","BA","OVS Altamura","3294","2026-05-25","SI"],["Puglia","BA","OVS Bari Max","1535","2026-05-25","SI"],["Puglia","BA","OVS Bari Blu","2113","2026-05-26","SI"],["Puglia","BA","OVS Bari Casamassima","180","2026-05-26","SI"],["Puglia","BA","OVS Andria","241","2026-05-27","SI"],["Puglia","BA","OVS Molfetta","1254","2026-05-27","SI"],["Puglia","BA","OVS Trani","123","2026-05-27","SI"],["Puglia","BA","OVS Bari Santa Caterina","5142","",""],["Puglia","BA","OVS Bari via Gimma","1751","",""],["Puglia","BA","OVS KIDS Bari Via Melo","1274","",""],["Puglia","BA","STEFANEL Bari Stefanel","9167","",""],["Puglia","BR","OVS Fasano","9062","2026-04-27","SI"],["Puglia","BR","OVS Brindisi","70","2026-04-28","SI"],["Puglia","BR","OVS Brindisi Retail Park","1754","2026-04-28","SI"],["Puglia","BR","UPIM Brindisi","5755","2026-04-28","SI"],["Puglia","BR","UPIM Mesagne","8847","2026-04-28","SI"],["Puglia","BT","OVS Barletta","209","2026-05-27","SI"],["Puglia","FG","OVS Manfredonia","1134","2026-06-08","SI"],["Puglia","FG","UPIM BK Foggia Bk","423","2026-06-08","SI"],["Puglia","FG","OVS Foggia","275","2026-06-09","SI"],["Puglia","FG","OVS Foggia Grandapulia","2133","2026-06-09","SI"],["Puglia","FG","UPIM BK Foggia Grandapulia Bk","8882","2026-06-09","SI"],["Puglia","LE","OVS Gallipoli","1075","",""],["Puglia","LE","OVS KIDS Lecce Cavallino Kids","1888","",""],["Puglia","LE","OVS Lecce Aligross","2095","",""],["Puglia","LE","OVS Lecce Cavallino","1669","",""],["Puglia","LE","OVS Lecce Leuca","1077","",""],["Puglia","LE","OVS Lecce Stadio","1074","",""],["Puglia","LE","OVS Surano","1076","",""],["Puglia","LE","STEFANEL Lecce Stefanel","9149","",""],["Puglia","LE","UPIM Casarano","3841","",""],["Puglia","LE","UPIM Lecce Templari","962","",""],["Puglia","TA","OVS Taranto","1541","",""],["Puglia","TA","OVS Taranto Magna Grecia","185","",""],["Puglia","TA","OVS Taranto Mongolfiera","7682","",""],["Puglia","TA","OVS Taranto di Palma","4762","",""],["Sardegna","CA","OVS Cagliari Corte del Sole","2324","2026-09-11",""],["Sardegna","CA","OVS Cagliari La Playa","8","2026-11-17",""],["Sardegna","CA","OVS Cagliari Petrarca","1667","2026-11-17",""],["Sardegna","CA","STEFANEL in OVS Cagliari Petrarca Stefanel","9519","2026-11-17",""],["Sardegna","CA","UPIM CROFF Cagliari Croff","442","2026-11-17",""],["Sardegna","CA","UPIM Cagliari Dante","3094","2026-11-17",""],["Sardegna","CA","UPIM Cagliari via Roma","237","2026-11-17",""],["Sardegna","CA","OVS Cagliari Le Vele","238","2026-11-19",""],["Sardegna","CA","OVS KIDS Quartu Sant' Elena Kids","1929","2026-11-19",""],["Sardegna","NU","OVS Nuoro","1084","2026-09-07",""],["Sardegna","NU","OVS Nuoro C.C. Le Torri","4945","2026-09-07",""],["Sardegna","NU","UPIM BK Nuoro Bk","436","2026-09-07",""],["Sardegna","NU","UPIM BK Nuoro C.C. Pratosardo Bk","428","2026-09-07",""],["Sardegna","OR","UPIM BK Oristano via Cagliari Bk","7766","2026-09-07",""],["Sardegna","OR","UPIM Oristano","3930","2026-09-07",""],["Sardegna","OR","UPIM Terralba","970","2026-09-11",""],["Sardegna","SS","OVS HOLIDAYS Porto Rotondo Holidays","5481","2026-09-08",""],["Sardegna","SS","OVS Olbia","3902","2026-09-08",""],["Sardegna","SS","UPIM Olbia","933","2026-09-08",""],["Sardegna","SS","OVS Sassari Predda Niedda","5127","2026-09-09",""],["Sardegna","SS","OVS Tempio Pausania","26","2026-09-09",""],["Sardegna","SS","UPIM BK Sorso BK","9887","2026-09-09",""],["Sardegna","SS","UPIM Sassari Predda Niedda","8846","2026-09-09",""],["Sardegna","SS","UPIM Tempio Pausania","934","2026-09-09",""],["Sardegna","SS","OVS Alghero","308","2026-09-10",""],["Sardegna","SS","OVS Sassari","159","2026-09-10",""],["Sardegna","SS","UPIM Sassari","3116","2026-09-10",""],["Sardegna","SU","OVS Carbonia Retail Park","5322","2026-11-18",""],["Sardegna","SU","OVS Iglesias","1519","2026-11-18",""],["Sardegna","SU","UPIM Carbonia","3890","2026-11-18",""],["Sicilia","AG","OVS Agrigento","2344","2026-09-18",""],["Sicilia","AG","OVS Canicattì","2326","2026-09-18",""],["Sicilia","AG","OVS Licata","1778","2026-09-18",""],["Sicilia","AG","OVS Sciacca","1779","",""],["Sicilia","CL","OVS Gela","1784","2026-09-18",""],["Sicilia","CL","UPIM Caltanissetta","5745","2026-09-18",""],["Sicilia","CT","OVS Catania Tenutella","5470","2026-03-13","SI"],["Sicilia","CT","OVS Caltagirone","1781","2026-05-04","SI"],["Sicilia","CT","OVS Misterbianco","224","2026-05-11","SI"],["Sicilia","CT","UPIM Misterbianco","964","2026-05-11","SI"],["Sicilia","CT","OVS Catania Porte di Catania","5475","2026-05-12","SI"],["Sicilia","CT","OVS Gravina di Catania Katanè","5148","2026-05-12","SI"],["Sicilia","CT","UPIM Catania Porte di Catania","3933","2026-05-12","SI"],["Sicilia","CT","OVS Catania Belpasso","1130","2026-07-08","SI"],["Sicilia","CT","OVS Acireale","1959","2026-07-15","SI"],["Sicilia","CT","OVS Catania Le Zagare","1518","2026-07-15","SI"],["Sicilia","CT","OVS Catania d'Annunzio","1553","2026-07-15","SI"],["Sicilia","CT","OVS Giarre","318","2026-07-15","SI"],["Sicilia","CT","OVS Riposto Conforama","218","2026-07-15","SI"],["Sicilia","CT","UPIM Catania l'Arena","958","2026-07-15","SI"],["Sicilia","EN","GAP Sicily Outlet GAP","4990","",""],["Sicilia","ME","OVS Messina","289","2026-04-15","SI"],["Sicilia","ME","OVS Messina Tremestieri","276","2026-04-15","SI"],["Sicilia","ME","UPIM Messina","925","2026-04-15","SI"],["Sicilia","ME","CROFF Capo D'Orlando","914","",""],["Sicilia","ME","OVS Capo D'Orlando Marina","164","",""],["Sicilia","ME","OVS Capo d'Orlando","1780","",""],["Sicilia","ME","OVS Milazzo San Filippo Mela","1663","",""],["Sicilia","PA","OVS Palermo da Vinci","1672","2026-03-13","SI"],["Sicilia","PA","OVS Palermo Conca d'Oro","5482","2026-08-31",""],["Sicilia","PA","OVS Palermo Forum","5329","2026-08-31",""],["Sicilia","PA","UPIM CROFF Palermo Conca d'Oro Croff","9133","2026-08-31",""],["Sicilia","PA","OVS Carini Poseidon","212","2026-09-01",""],["Sicilia","PA","OVS KIDS Carini","1924","2026-09-01",""],["Sicilia","PA","OVS Partinico","1783","2026-09-01",""],["Sicilia","PA","UPIM CROFF Carini Croff","9682","2026-09-01",""],["Sicilia","PA","OVS Palermo Calatafimi","329","",""],["Sicilia","PA","OVS Palermo Cordova","1671","",""],["Sicilia","PA","OVS Palermo Ruggero VII","5332","",""],["Sicilia","PA","OVS Palermo Strasburgo","248","",""],["Sicilia","PA","UPIM BK Palermo Bk","7765","",""],["Sicilia","PA","UPIM Bagheria","6872","",""],["Sicilia","PA","UPIM CROFF Palermo Vittorio Veneto","380","",""],["Sicilia","PA","UPIM Palermo La Malfa","996","",""],["Sicilia","PA","UPIM Palermo Libertà","6336","",""],["Sicilia","PA","UPIM Palermo Pacinotti","160","",""],["Sicilia","PA","UPIM Palermo Via Veneto","965","",""],["Sicilia","RG","UPIM Modica","6895","2026-05-04","SI"],["Sicilia","RG","UPIM Ragusa","5750","2026-05-04","SI"],["Sicilia","SR","OVS Melilli Belvedere","5333","2026-04-14","SI"],["Sicilia","SR","OVS Siracusa Archimede","4947","2026-04-14","SI"],["Sicilia","SR","UPIM CROFF Ortigia","920","2026-04-14","SI"],["Sicilia","TP","OVS Castelvetrano","4761","",""],["Sicilia","TP","OVS Marsala","251","",""],["Sicilia","TP","OVS Trapani","257","",""],["Sicilia","TP","OVS Trapani","4946","",""],["Sicilia","TP","SHAKA Trapani Shaka","5501","",""]];   // [regione, insegna e citta', cdc]
+
+const K = 'taccuino-sopralluogo-v2';
+let stato = {sessioni: [], corrente: null};
+let attivo = null;           // {n, t0, etichetta}
+let apertoN = null;
+
+const q = s => document.querySelector(s);
+const testoPunto = n => (PUNTI.find(p => p[0] === n) || [0,'','punto ' + n])[2];
+const argPunto  = n => (PUNTI.find(p => p[0] === n) || [0,'',''])[1].split('\n')[0];
+
+function carica(){
+  try{ const g = localStorage.getItem(K); if(g) stato = JSON.parse(g); }catch(e){}
+  if(!stato.sessioni || !stato.sessioni.length) nuovaSessione(false);
+  if(!sessione()) stato.corrente = stato.sessioni[0].id;
+}
+function salva(){
+  try{ localStorage.setItem(K, JSON.stringify(stato)); }
+  catch(e){ toast('Memoria del browser piena: esporta subito'); }
+}
+function sessione(){ return stato.sessioni.find(s => s.id === stato.corrente); }
+function oggi(){ return new Date().toISOString().slice(0,10); }
+function nuovaSessione(rendi){
+  const s = {id:'s' + Date.now(), negozio:'', cdc:'', data:oggi(), righe:{}, libere:[]};
+  stato.sessioni.unshift(s); stato.corrente = s.id;
+  chiudiFoto(false); salva();
+  if(rendi !== false){ mostra('Giro'); rendiTutto(); q('#fNegozio').focus(); }
+}
+/* Una riga e' "segnata" solo se porta davvero qualcosa: una risposta, una nota
+   o almeno una foto. Il semplice tocco sulla piastrella non segna nulla. */
+function segnata(r){ return !!(r.r || (r.nota && r.nota.trim()) || r.foto.length); }
+
+function riga(n){
+  const s = sessione();
+  if(!s.righe[n]) s.righe[n] = {r:'', nota:'', foto:[]};
+  return s.righe[n];
+}
+function hhmm(ms){
+  const d = new Date(ms);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function toast(t){
+  const d = document.createElement('div'); d.className = 'toast'; d.textContent = t;
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2400);
+}
+
+/* ---- finestra foto: una sola aperta, aprirne un'altra chiude la precedente ---- */
+function apriFoto(n, etichetta){
+  chiudiFoto(false);
+  attivo = {n, t0: Date.now(), etichetta: etichetta || ''};
+  salva(); rendiTutto();
+  toast((n ? 'Punto ' + n : 'Rilievo libero') + ' · scatta pure');
+}
+function chiudiFoto(rendi){
+  if(attivo){
+    const f = [attivo.t0, Date.now()];
+    if(attivo.n) riga(attivo.n).foto.push(f);
+    else sessione().libere.push({etichetta: attivo.etichetta, foto: f});
+    attivo = null; salva();
+  }
+  if(rendi !== false) rendiTutto();
+}
+function rendiBanner(){
+  const b = q('#banner'); b.hidden = !attivo;
+  if(attivo){
+    q('#bannerPunto').textContent = attivo.n
+      ? 'Punto ' + attivo.n + ' · ' + (attivo.etichetta || argPunto(attivo.n))
+      : 'Rilievo libero' + (attivo.etichetta ? ' · ' + attivo.etichetta : '');
+    q('#bannerOra').textContent = 'foto in corso da ' + hhmm(attivo.t0) +
+      ' — gli scatti di adesso vanno qui';
+  }
+}
+
+/* ------------------------------------ viste ------------------------------------ */
+function rendiTutto(){ rendiBanner(); rendiTesta(); rendiPiastrelle(); rendiElenco(); }
+
+function rendiTesta(){
+  const s = sessione();
+  q('#tNegozio').textContent = s.negozio || 'Nuovo sopralluogo';
+  const comp = Object.values(s.righe).filter(segnata).length;
+  q('#tSub').textContent = (s.cdc ? 'CDC ' + s.cdc + ' · ' : '') + comp + '/' + PUNTI.length;
+  q('#fNegozio').value = s.negozio; q('#fCdc').value = s.cdc; q('#fData').value = s.data;
+  const scelto = NEGOZI.findIndex(x => x[2] === s.negozio && x[3] === s.cdc);
+  q('#fPV').value = scelto >= 0 ? String(scelto) : '';
+  const sel = q('#fSessioni'); sel.innerHTML = '';
+  stato.sessioni.forEach(x => {
+    const o = document.createElement('option');
+    o.value = x.id; o.textContent = (x.negozio || 'senza nome') + ' · ' + (x.data || '');
+    if(x.id === stato.corrente) o.selected = true;
+    sel.appendChild(o);
+  });
+  const foto = Object.values(s.righe).reduce((a,r) => a + r.foto.length, 0) + s.libere.length;
+  q('#conta').innerHTML =
+    '<span><b>' + Object.values(s.righe).filter(segnata).length + '</b> segnati</span>' +
+    '<span><b>' + foto + '</b> finestre foto</span>' +
+    '<span><b>' + s.libere.length + '</b> liberi</span>';
+}
+
+function rendiPiastrelle(){
+  const cont = q('#piastrelle'); cont.innerHTML = '';
+  let zona = null, g = null;
+  RILIEVI.forEach(([et, n, esito, z]) => {
+    if(z !== zona){
+      zona = z;
+      const sec = document.createElement('section'); sec.className = 'zona';
+      const h = document.createElement('div'); h.className = 'eyebrow'; h.textContent = z;
+      sec.appendChild(h);
+      g = document.createElement('div'); g.className = 'griglia';
+      sec.appendChild(g); cont.appendChild(sec);
+    }
+    const r = riga(n);
+    const on = attivo && attivo.n === n;
+    const b = document.createElement('div');
+    b.className = 'piastrella';
+    if(segnata(r)) b.dataset.segnato = '1';
+    if(on) b.dataset.attivo = '1';
+    b.innerHTML =
+      '<button type="button" class="scatta"><span class="et">' + et + '</span></button>' +
+      '<span class="pie"><span class="tag">p.' + n + '</span>' +
+      (r.r ? '<span>' + r.r + '</span>' : '') +
+      (r.foto.length ? '<span>' + r.foto.length + ' foto</span>' : '') +
+      (r.nota ? '<span>nota</span>' : '') +
+      (on ? '<span>in corso</span>' : '') +
+      '<button type="button" class="scheda-apri" aria-label="Apri la scheda del punto ' +
+      n + '">SI/NO · nota</button></span>';
+    b.querySelector('.scatta').addEventListener('click', () => {
+      if(attivo && attivo.n === n) chiudiFoto(true);   // seconda pressione: chiude
+      else apriFoto(n, et);                            // sempre una finestra in piu'
+    });
+    b.querySelector('.scheda-apri').addEventListener('click', e => {
+      e.stopPropagation(); apriPunto(n);
+    });
+    g.appendChild(b);
+  });
+}
+
+function rendiElenco(){
+  const testo = q('#fCerca').value.trim().toLowerCase();
+  const el = q('#elenco'); el.innerHTML = '';
+  let arg = null, g = null, visti = 0;
+  PUNTI.forEach(([n, argomento, t]) => {
+    if(testo && !(t.toLowerCase().includes(testo) || argomento.toLowerCase().includes(testo)
+                  || String(n) === testo)) return;
+    visti++;
+    if(argomento !== arg){
+      arg = argomento;
+      g = document.createElement('section'); g.className = 'gruppo';
+      const h = document.createElement('div'); h.className = 'eyebrow';
+      h.textContent = argomento.split('\n')[0] || 'Altro';
+      g.appendChild(h); el.appendChild(g);
+    }
+    const r = riga(n);
+    const b = document.createElement('button');
+    b.className = 'punto'; b.type = 'button'; b.dataset.r = r.r;
+    b.innerHTML = '<span class="num">' + n + '</span><span class="txt">' +
+      t.replace(/</g,'&lt;').slice(0,150) +
+      (r.nota ? '<span class="nota">' + r.nota.replace(/</g,'&lt;') + '</span>' : '') +
+      (r.foto.length ? '<span class="foto">FOTO ' + r.foto.length + '</span>' : '') +
+      '</span><span class="stato">' + (r.r || '—') + '</span>';
+    b.addEventListener('click', () => apriPunto(n));
+    g.appendChild(b);
+  });
+  if(!visti) el.innerHTML = '<p class="vuoto">Nessun punto corrisponde alla ricerca.</p>';
+}
+
+function mostra(nome){
+  ['Rilievi','Elenco','Giro'].forEach(v => {
+    q('#v' + v).dataset.on = (v === nome) ? '1' : '0';
+    q('#tab' + v).setAttribute('aria-selected', String(v === nome));
+  });
+  scrollTo({top:0});
+}
+
+/* --------------------------------- scheda punto -------------------------------- */
+function apriPunto(n){
+  apertoN = n;
+  const r = riga(n);
+  q('#dArg').textContent = 'Punto ' + n + ' · ' + argPunto(n);
+  q('#dQ').textContent = testoPunto(n);
+  document.querySelectorAll('#dPunto .rispo button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.value === r.r)));
+  q('#dNota').value = r.nota;
+  q('#dFoto').textContent = (attivo && attivo.n === n) ? 'Chiudi le foto' : 'Foto da qui';
+  q('#dMeta').textContent = r.foto.length
+    ? 'finestre foto: ' + r.foto.map(f => hhmm(f[0]) + '–' + hhmm(f[1])).join(', ') : '';
+  q('#dPunto').showModal();
+}
+function chiudiPunto(){
+  if(apertoN !== null){ riga(apertoN).nota = q('#dNota').value.trim(); salva(); }
+  apertoN = null; q('#dPunto').close(); rendiTutto();
+}
+
+/* ------------------- salvataggio del file del negozio (.html) ------------------- */
+/* Il file salvato E' l'applicazione con dentro i dati: riaprendolo si continua a
+   lavorare e si risalva. Serve una gesture dell'utente, quindi il salvataggio parte
+   dal pulsante e dai passaggi di negozio, mai da solo. */
+function nomeFile(s){
+  const base = (s.negozio || 'sopralluogo').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  return 'Sopralluogo_' + base + (s.cdc ? '_' + s.cdc : '') + '_' + (s.data || oggi()) + '.html';
+}
+function documentoSalvabile(){
+  const c = document.documentElement.cloneNode(true);
+  c.querySelectorAll('dialog').forEach(d => d.removeAttribute('open'));
+  c.querySelectorAll('.toast').forEach(t => t.remove());
+  ['#piastrelle','#elenco','#fRegione','#fProvincia','#fPV','#fSessioni']
+    .forEach(k => { const e = c.querySelector(k); if(e) e.innerHTML = ''; });
+  const v = c.querySelector('#datiIncorporati'); if(v) v.remove();
+  const s = document.createElement('script');
+  s.id = 'datiIncorporati'; s.type = 'application/json';
+  s.textContent = JSON.stringify(stato).replace(/</g,'\\u003c');
+  const b = c.querySelector('body') || c;
+  b.insertBefore(s, b.firstChild);
+  return '<!doctype html>\n' + c.outerHTML;
+}
+async function salvaFile(silenzioso){
+  chiudiFoto(false);
+  const s = sessione();
+  const nome = nomeFile(s), testo = documentoSalvabile();
+  if(window.claude && claude.use){
+    try{
+      const d = await claude.use('downloads');
+      if(d){ await d.save({filename: nome, data: testo}); toast('Salvato ' + nome); return; }
+    }catch(e){ /* si prosegue con il salvataggio del browser */ }
+  }
+  try{
+    const url = URL.createObjectURL(new Blob([testo], {type:'text/html'}));
+    const a = document.createElement('a');
+    a.href = url; a.download = nome; document.body.appendChild(a); a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
+    if(!silenzioso) toast('Salvato ' + nome);
+  }catch(e){ toast('Salvataggio non riuscito: usa Esporta'); }
+}
+function importaIncorporati(){
+  const el = document.getElementById('datiIncorporati');
+  if(!el) return;
+  try{
+    const d = JSON.parse(el.textContent);
+    if(!d || !d.sessioni || !d.sessioni.length) return;
+    const per = {};
+    (stato.sessioni || []).forEach(s => per[s.id] = s);
+    d.sessioni.forEach(s => per[s.id] = s);       // il file riaperto e' la versione buona
+    stato.sessioni = Object.values(per);
+    stato.corrente = d.corrente || stato.corrente;
+    salva();
+  }catch(e){}
+}
+
+/* --------------------------------- esportazione -------------------------------- */
+function testoEsporta(){
+  return JSON.stringify({
+    taccuino: 2,
+    esportato: new Date().toISOString(),
+    sopralluoghi: stato.sessioni.map(s => ({
+      negozio: s.negozio, cdc: s.cdc, data: s.data,
+      righe: Object.entries(s.righe)
+        .filter(([n, r]) => r.r || r.nota || r.foto.length)
+        .map(([n, r]) => ({
+          punto: Number(n), riga_excel: Number(n) + 10, risposta: r.r, nota: r.nota,
+          foto: r.foto.map(f => [new Date(f[0]).toISOString(), new Date(f[1]).toISOString()])
+        })).sort((a,b) => a.punto - b.punto),
+      liberi: (s.libere || []).map(l => ({
+        etichetta: l.etichetta,
+        foto: [new Date(l.foto[0]).toISOString(), new Date(l.foto[1]).toISOString()]
+      }))
+    }))
+  }, null, 1);
+}
+function apriEsporta(){
+  chiudiFoto(false);
+  q('#eTesto').value = testoEsporta();
+  q('#eMeta').textContent = stato.sessioni.length + ' sopralluoghi in memoria su questo telefono';
+  q('#dEsporta').showModal();
+}
+
+/* -------------------------- elenco dei punti vendita --------------------------- */
+/* NEGOZI: [regione, provincia, insegna e citta', cdc, data 2026, fatto] */
+function ricorda(chiave, valore){
+  try{ localStorage.setItem(K + '-' + chiave, valore); }catch(e){}
+}
+function ricordato(chiave){
+  try{ return localStorage.getItem(K + '-' + chiave) || ''; }catch(e){ return ''; }
+}
+function riempiRegioni(){
+  const r = q('#fRegione');
+  r.innerHTML = '<option value="">Tutte le regioni</option>' +
+    [...new Set(NEGOZI.map(x => x[0]))].map(x => '<option>' + x + '</option>').join('');
+  r.value = ricordato('regione');
+}
+function riempiProvince(){
+  const p = q('#fProvincia'), reg = q('#fRegione').value;
+  const sigle = [...new Set(NEGOZI.filter(x => !reg || x[0] === reg).map(x => x[1]))].sort();
+  p.innerHTML = '<option value="">Tutte le province</option>' +
+    sigle.map(s => '<option>' + s + '</option>').join('');
+  const u = ricordato('provincia');
+  p.value = sigle.includes(u) ? u : '';
+}
+function riempiPV(){
+  const pv = q('#fPV'), reg = q('#fRegione').value, pr = q('#fProvincia').value;
+  pv.innerHTML = '<option value="">— negozio non in elenco —</option>';
+  let gruppo = null, g = null;
+  NEGOZI.forEach(([regione, prov, nome, cdc, data, fatto], i) => {
+    if((reg && regione !== reg) || (pr && prov !== pr)) return;
+    const et = (data ? data.slice(8,10) + '/' + data.slice(5,7) : 'senza data');
+    if(et !== gruppo){
+      gruppo = et;
+      g = document.createElement('optgroup');
+      g.label = (reg ? '' : regione + ' · ') + (pr ? '' : prov + ' · ') + et;
+      pv.appendChild(g);
+    }
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = nome + (cdc ? ' · ' + cdc : '') + (fatto === 'SI' ? ' ✓' : '');
+    g.appendChild(o);
+  });
+}
+
+/* ------------------------------------ eventi ----------------------------------- */
+riempiRegioni(); riempiProvince(); riempiPV();
+carica(); importaIncorporati(); rendiTutto();
+
+q('#fRegione').addEventListener('change', e => {
+  ricorda('regione', e.target.value); ricorda('provincia', '');
+  riempiProvince(); riempiPV(); rendiTesta();
+});
+q('#fProvincia').addEventListener('change', e => {
+  ricorda('provincia', e.target.value); riempiPV(); rendiTesta();
+});
+q('#fPV').addEventListener('change', e => {
+  const i = e.target.value;
+  if(i === '') return;
+  const s = sessione();
+  s.negozio = NEGOZI[i][2]; s.cdc = NEGOZI[i][3];
+  salva(); rendiTesta();
+});
+q('#bSalva').addEventListener('click', () => salvaFile());
+q('#bSalva2').addEventListener('click', () => salvaFile());
+
+q('#tabRilievi').addEventListener('click', () => mostra('Rilievi'));
+q('#tabElenco').addEventListener('click', () => mostra('Elenco'));
+q('#tabGiro').addEventListener('click', () => mostra('Giro'));
+q('#fCerca').addEventListener('input', rendiElenco);
+['fNegozio','fCdc','fData'].forEach(id =>
+  q('#' + id).addEventListener('input', e => {
+    const s = sessione();
+    s[id === 'fNegozio' ? 'negozio' : id === 'fCdc' ? 'cdc' : 'data'] = e.target.value;
+    salva(); rendiTesta();
+  }));
+q('#fSessioni').addEventListener('change', e => {
+  chiudiFoto(false); stato.corrente = e.target.value; salva(); rendiTutto();
+});
+q('#bNuova').addEventListener('click', async () => {
+  const s = sessione();
+  const pieno = Object.values(s.righe).some(r => r.r || r.nota || r.foto.length);
+  if(pieno) await salvaFile();            // il negozio chiuso viene messo al sicuro
+  nuovaSessione(true);
+});
+q('#bEsporta').addEventListener('click', apriEsporta);
+q('#bTema').addEventListener('click', () => {
+  const r = document.documentElement;
+  const scuro = r.getAttribute('data-theme') === 'dark' ||
+    (!r.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  r.setAttribute('data-theme', scuro ? 'light' : 'dark');
+});
+q('#bChiudiFoto').addEventListener('click', () => chiudiFoto(true));
+q('#bAnnullaFoto').addEventListener('click', () => {   // tocco sbagliato: non resta traccia
+  attivo = null; salva(); rendiTutto(); toast('Finestra annullata');
+});
+q('#bNota').addEventListener('click', () => {
+  if(attivo && attivo.n) apriPunto(attivo.n);
+  else toast('Rilievo libero: la nota la detti alla chiusura');
+});
+q('#bLibera').addEventListener('click', () => {
+  const et = prompt('Che cosa stai fotografando?') || '';
+  apriFoto(0, et.trim());
+});
+
+document.querySelectorAll('#dPunto .rispo button').forEach(b =>
+  b.addEventListener('click', () => {
+    const r = riga(apertoN);
+    r.r = (r.r === b.value) ? '' : b.value;
+    document.querySelectorAll('#dPunto .rispo button').forEach(x =>
+      x.setAttribute('aria-pressed', String(x.value === r.r)));
+    salva();
+  }));
+q('#dFoto').addEventListener('click', () => {
+  const n = apertoN;
+  riga(n).nota = q('#dNota').value.trim();
+  q('#dPunto').close(); apertoN = null;
+  if(attivo && attivo.n === n) chiudiFoto(true); else apriFoto(n, '');
+});
+q('#dChiudi').addEventListener('click', chiudiPunto);
+q('#dPunto').addEventListener('close', () => { if(apertoN !== null) chiudiPunto(); });
+
+q('#eCopia').addEventListener('click', async () => {
+  const t = q('#eTesto');
+  try{ await navigator.clipboard.writeText(t.value); toast('Copiato'); }
+  catch(e){ t.select(); toast('Seleziona e copia'); }
+});
+q('#eChiudi').addEventListener('click', () => q('#dEsporta').close());
+
+/* Salvataggio file: solo nella pagina pubblicata, e se il visualizzatore lo concede. */
+q('#eScarica').hidden = true;
+if(window.claude && claude.use){
+  claude.use('downloads').then(d => {
+    if(!d) return;
+    const b = q('#eScarica'); b.hidden = false;
+    b.addEventListener('click', async () => {
+      try{ await d.save({filename:'sopralluoghi-' + oggi() + '.json', data: testoEsporta()}); }
+      catch(e){ toast('Salvataggio non riuscito: usa Copia'); }
+    });
+  }).catch(() => {});
+}
+</script>
+
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/fflate.umd.js"></script>
+<script src="native-bridge.js"></script>
+
+</body>
+</html>

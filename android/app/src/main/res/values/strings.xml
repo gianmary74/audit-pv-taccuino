@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Taccuino Sopralluogo</string>
+    <string name="title_activity_main">Taccuino Sopralluogo</string>
+    <string name="package_name">it.dimaria.auditpv.taccuino</string>
+    <string name="custom_url_scheme">it.dimaria.auditpv.taccuino</string>
+</resources>

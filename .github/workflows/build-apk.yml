@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dipendenze
+        run: npm install
+
+      - name: Ricostruisci la pagina del taccuino
+        run: python3 build_www.py
+
+      - name: Sincronizza Capacitor
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Permessi gradlew
+        run: chmod +x android/gradlew
+
+      - name: Compila APK di debug
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Carica APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: taccuino-sopralluogo-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

@@ -1,0 +1,9 @@
+{
+  "appId": "it.dimaria.auditpv.taccuino",
+  "appName": "Taccuino Sopralluogo",
+  "webDir": "www",
+  "backgroundColor": "#F7F5F1",
+  "android": {
+    "allowMixedContent": false
+  }
+}
