@@ -1,16 +1,39 @@
 /* Integrazione nativa del taccuino, attiva solo dentro l'app Android.
-   Non tocca la logica del taccuino (variabili e funzioni di app_modello.html):
-   aggiunge un pulsante "Esporta e condividi" che, oltre al salvataggio nel
-   browser gia' previsto, scrive nella cartella privata dell'app tre file per
-   il negozio corrente (HTML di lavoro, JSON di esportazione, PDF di sintesi
-   grezza) li' impacchetta in uno .zip e apre il foglio di condivisione nativo
-   di Android, cosi' l'utente sceglie con un tocco dove mandarlo (pCloud, mail,
-   ecc.) senza che l'app debba conoscere alcuna chiave o token. */
+   Non tocca la logica del taccuino originale (le variabili e le funzioni di
+   app_modello.html restano quelle di sempre, valide anche per la versione
+   HTML/PWA che la skill continua a generare): qui si aggiunge solo, sopra.
+
+   Due cose in piu' rispetto al taccuino da browser:
+
+   1. Scatto reale con la fotocamera del telefono. Nella versione HTML "Foto
+      da qui" apre solo una finestra temporale (l'abbinamento con le foto,
+      scattate con l'app fotocamera normale, avviene dopo, durante la
+      lavorazione della campagna). Qui, siccome l'app ha accesso diretto alla
+      fotocamera, lo stesso tocco apre davvero la fotocamera: la finestra
+      temporale resta comunque registrata come prima (niente si toglie alla
+      compatibilita' con lo script di fusione), ma in piu' la foto scattata
+      viene salvata nello spazio privato dell'app, cosi' da poterla includere
+      subito nel pacchetto di fine sopralluogo. Ogni foto viene anche
+      salvata nella libreria normale del telefono (saveToGallery), quindi
+      resta comunque disponibile per l'abbinamento GPS/orario della skill
+      come con qualunque altra foto.
+   2. Pulsante "Esporta e condividi": scrive nella cartella privata dell'app
+      tre file per il negozio corrente (HTML di lavoro, JSON di esportazione,
+      PDF di sintesi grezza con le miniature delle foto scattate), li
+      impacchetta in uno .zip e apre il foglio di condivisione nativo di
+      Android, cosi' l'utente sceglie con un tocco dove mandarlo (pCloud,
+      mail, ecc.) senza che l'app debba conoscere alcuna chiave o token. */
 (function () {
   function nativo() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   }
   if (!nativo()) return;
+
+  var Filesystem = window.Capacitor.Plugins.Filesystem;
+  var Share = window.Capacitor.Plugins.Share;
+  var Camera = window.Capacitor.Plugins.Camera;
+  var DIR_DATA = 'DATA';
+  var DIR_CACHE = 'CACHE';
 
   function hhmm(ms) {
     var d = new Date(ms);
@@ -28,8 +51,84 @@
     return btoa(bin);
   }
   function uint8ToBase64(bytes) { return arrayBufferToBase64(bytes.buffer); }
+  function base64ToUint8(b64) {
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
 
-  function pdfDaSessione(s) {
+  /* --------------------------- scatto con la fotocamera -------------------------- */
+  function cartellaFotoSessione() {
+    return 'foto_catturate/' + sessione().id;   // sessione() e' gia' definita dal taccuino
+  }
+  async function scatta(n, et) {
+    try {
+      var foto = await Camera.getPhoto({
+        quality: 70,
+        allowEditing: false,
+        resultType: 'base64',
+        source: 'CAMERA',
+        saveToGallery: true
+      });
+      if (!foto || !foto.base64String) return;
+      var ext = (foto.format || 'jpeg').replace('jpg', 'jpeg');
+      var nomeFile = (n ? String(n) : 'libero') + '__' + Date.now() + '.' + ext;
+      await Filesystem.writeFile({
+        path: cartellaFotoSessione() + '/' + nomeFile,
+        data: foto.base64String,
+        directory: DIR_DATA,
+        recursive: true
+      });
+      toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero'));
+    } catch (e) {
+      /* scatto annullato dall'utente: non e' un errore da segnalare */
+    }
+  }
+
+  // Ogni apertura di finestra foto nel taccuino passa da apriFoto(n, et):
+  // tocco su una piastrella, "Foto da qui" nella scheda, "Rilievo libero".
+  // Si aggancia li', senza toccare la funzione originale.
+  var _apriFoto = window.apriFoto;
+  window.apriFoto = function (n, et) {
+    _apriFoto(n, et);
+    scatta(n, et);
+  };
+
+  // Nel banner (visibile mentre una finestra foto e' aperta) si aggiunge un
+  // pulsante per scattare altre foto sullo stesso punto senza doverlo
+  // riaprire.
+  function aggiungiPulsanteBanner() {
+    var banner = document.getElementById('banner');
+    var rifBottone = document.getElementById('bNota');
+    if (!banner || !rifBottone || document.getElementById('bScattaAncora')) return;
+    var b = document.createElement('button');
+    b.id = 'bScattaAncora'; b.type = 'button'; b.textContent = 'Scatta ancora';
+    b.addEventListener('click', function () {
+      if (window.attivo) scatta(window.attivo.n, window.attivo.etichetta);
+    });
+    rifBottone.parentNode.insertBefore(b, rifBottone);
+  }
+
+  /* ------------------------------- generazione PDF -------------------------------- */
+  async function fotoDellaSessione() {
+    var cartella = cartellaFotoSessione();
+    var out = {};   // { puntoOLibero: [ {nomeFile, base64, formato} ] }
+    try {
+      var lista = await Filesystem.readdir({ path: cartella, directory: DIR_DATA });
+      for (var i = 0; i < lista.files.length; i++) {
+        var nomeFile = lista.files[i].name || lista.files[i];
+        var m = /^(.+?)__(\d+)\.(\w+)$/.exec(nomeFile);
+        if (!m) continue;
+        var chiave = m[1], formato = m[3];
+        var letto = await Filesystem.readFile({ path: cartella + '/' + nomeFile, directory: DIR_DATA });
+        if (!out[chiave]) out[chiave] = [];
+        out[chiave].push({ nomeFile: nomeFile, base64: letto.data, formato: formato });
+      }
+    } catch (e) { /* nessuna foto scattata in questa sessione: cartella assente */ }
+    return out;
+  }
+
+  function pdfDaSessione(s, foto) {
     var jsPDF = window.jspdf.jsPDF;
     var doc = new jsPDF({ unit: 'mm', format: 'a4' });
     var y = 18;
@@ -40,13 +139,33 @@
       '    Data: ' + (s.data || '—'), 14, y); y += 8;
     doc.setDrawColor(180); doc.line(14, y, 196, y); y += 6;
 
+    function nuovaPaginaSeServe(altezzaExtra) {
+      if (y + (altezzaExtra || 0) > 275) { doc.addPage(); y = 18; }
+    }
+    function immaginiPer(chiave) {
+      var elenco = foto[chiave] || [];
+      if (!elenco.length) return;
+      var LATO = 45, MARG = 4, perRiga = 3, i = 0;
+      nuovaPaginaSeServe(LATO + 4);
+      var x0 = 14;
+      elenco.forEach(function (f) {
+        if (i > 0 && i % perRiga === 0) { y += LATO + MARG; nuovaPaginaSeServe(LATO + 4); }
+        var x = x0 + (i % perRiga) * (LATO + MARG);
+        try {
+          doc.addImage('data:image/' + f.formato + ';base64,' + f.base64, f.formato.toUpperCase(), x, y, LATO, LATO);
+        } catch (e) { /* formato non riconosciuto da jsPDF: si salta la miniatura */ }
+        i++;
+      });
+      y += LATO + 6;
+    }
+
     var righe = Object.keys(s.righe || {}).map(function (n) {
       var r = s.righe[n]; return { n: Number(n), r: r.r, nota: r.nota, foto: r.foto || [] };
-    }).filter(function (r) { return r.r || (r.nota && r.nota.trim()) || r.foto.length; })
+    }).filter(function (r) { return r.r || (r.nota && r.nota.trim()) || r.foto.length || foto[String(r.n)]; })
       .sort(function (a, b) { return a.n - b.n; });
 
     righe.forEach(function (r) {
-      if (y > 270) { doc.addPage(); y = 18; }
+      nuovaPaginaSeServe(14);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
       doc.text('Punto ' + r.n + (r.r ? '  —  ' + r.r : ''), 14, y); y += 5;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
@@ -59,21 +178,26 @@
         doc.setTextColor(120); doc.text('Finestre foto: ' + finestre, 14, y); doc.setTextColor(0);
         y += 5;
       }
+      y += 2;
+      immaginiPer(String(r.n));
       y += 3;
     });
-    (s.libere || []).forEach(function (l) {
-      if (y > 270) { doc.addPage(); y = 18; }
+    (s.libere || []).forEach(function (l, idx) {
+      nuovaPaginaSeServe(14);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
       doc.text('Rilievo libero' + (l.etichetta ? ': ' + l.etichetta : ''), 14, y); y += 5;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(120);
       doc.text('Finestra foto: ' + hhmm(l.foto[0]) + '–' + hhmm(l.foto[1]), 14, y);
-      doc.setTextColor(0); y += 8;
+      doc.setTextColor(0); y += 6;
     });
+    if (foto['libero'] && foto['libero'].length) immaginiPer('libero');
+
     doc.setFontSize(7.5); doc.setTextColor(140);
-    doc.text('Le foto restano nella libreria del telefono: qui sono registrate solo le finestre orarie con cui verranno abbinate ai punti durante la lavorazione della campagna.', 14, 289, { maxWidth: 182 });
+    doc.text('Sintesi grezza generata sul telefono. Le foto scattate dall\'app sono incluse qui in miniatura e nello .zip; una copia a piena risoluzione resta anche nella libreria foto del telefono per l\'abbinamento nella lavorazione della campagna.', 14, 289, { maxWidth: 182 });
     return doc.output('arraybuffer');
   }
 
+  /* --------------------------- esporta e condividi -------------------------------- */
   async function esportaECondividi() {
     try {
       var s = sessione();               // funzione gia' definita da app_modello.html
@@ -82,27 +206,24 @@
       var cartella = 'sopralluoghi/' + nomeBase;
       var htmlTesto = documentoSalvabile();   // gia' definita: HTML con i dati incorporati
       var jsonTesto = testoEsporta();         // gia' definita: JSON per la lavorazione
-
-      var Filesystem = window.Capacitor.Plugins.Filesystem;
-      var Share = window.Capacitor.Plugins.Share;
-      var Directory = { CACHE: 'CACHE' };
+      var foto = await fotoDellaSessione();
 
       async function scrivi(nomeFile, dataStr) {
         await Filesystem.writeFile({
           path: cartella + '/' + nomeFile, data: dataStr,
-          directory: Directory.CACHE, recursive: true, encoding: 'utf8'
+          directory: DIR_CACHE, recursive: true, encoding: 'utf8'
         });
       }
       async function scriviBinario(nomeFile, base64) {
         await Filesystem.writeFile({
           path: cartella + '/' + nomeFile, data: base64,
-          directory: Directory.CACHE, recursive: true
+          directory: DIR_CACHE, recursive: true
         });
       }
 
       await scrivi(nomeBase + '.html', htmlTesto);
       await scrivi(nomeBase + '.json', jsonTesto);
-      var pdfBuf = pdfDaSessione(s);
+      var pdfBuf = pdfDaSessione(s, foto);
       await scriviBinario(nomeBase + '.pdf', arrayBufferToBase64(pdfBuf));
 
       var enc = new TextEncoder();
@@ -110,12 +231,18 @@
       pacchetto[nomeBase + '.html'] = enc.encode(htmlTesto);
       pacchetto[nomeBase + '.json'] = enc.encode(jsonTesto);
       pacchetto[nomeBase + '.pdf'] = new Uint8Array(pdfBuf);
+      Object.keys(foto).forEach(function (chiave) {
+        foto[chiave].forEach(function (f) {
+          pacchetto['foto/' + f.nomeFile] = base64ToUint8(f.base64);
+        });
+      });
       var zippato = fflate.zipSync(pacchetto, { level: 6 });
       await scriviBinario(nomeBase + '.zip', uint8ToBase64(zippato));
 
-      var uriZip = (await Filesystem.getUri({ path: cartella + '/' + nomeBase + '.zip', directory: Directory.CACHE })).uri;
+      var uriZip = (await Filesystem.getUri({ path: cartella + '/' + nomeBase + '.zip', directory: DIR_CACHE })).uri;
 
-      toast('Salvato: ' + nomeBase + '.zip (html, json, pdf)');
+      var nFoto = Object.keys(foto).reduce(function (a, k) { return a + foto[k].length; }, 0);
+      toast('Salvato: ' + nomeBase + '.zip (html, json, pdf' + (nFoto ? ', ' + nFoto + ' foto' : '') + ')');
       try {
         await Share.share({
           title: 'Sopralluogo ' + (s.negozio || ''),
@@ -134,7 +261,7 @@
     var b = document.createElement('button');
     b.type = 'button';
     b.className = rif.className;
-    b.textContent = 'Esporta e condividi (html + json + pdf)';
+    b.textContent = 'Esporta e condividi (html + json + pdf + foto)';
     b.style.marginTop = '8px';
     b.addEventListener('click', esportaECondividi);
     rif.parentNode.insertBefore(b, rif.nextSibling);
@@ -143,5 +270,6 @@
   window.addEventListener('DOMContentLoaded', function () {
     aggiungiPulsante('bSalva');
     aggiungiPulsante('bSalva2');
+    aggiungiPulsanteBanner();
   });
 })();
