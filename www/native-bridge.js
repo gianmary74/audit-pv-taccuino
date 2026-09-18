@@ -207,25 +207,43 @@
     } catch (e) { return null; /* scatto annullato dall'utente */ }
   }
 
+  // Un solo scatto alla volta. Il pulsante "+ Foto" e' fatto apposta per
+  // essere toccato piu' volte di seguito sullo stesso punto (piu' foto in
+  // rapida sequenza): se un secondo tocco arriva mentre la fotocamera del
+  // tocco precedente e' ancora aperta (o si sta ancora salvando la foto),
+  // la richiesta getUserMedia in piu' entra in conflitto con quella gia' in
+  // corso e puo' fallire in silenzio (la promessa si rifiuta, si ripiega
+  // sulla fotocamera nativa, e se anche quella fallisce o viene annullata
+  // la funzione tornava senza dire nulla): e' cosi' che una foto "spariva"
+  // senza nessun avviso. Un lucchetto semplice evita che due scatti partano
+  // insieme, e un avviso esplicito segnala quando un tocco viene ignorato o
+  // quando lo scatto fallisce davvero, cosi' non resta piu' nulla di muto.
+  var scattoInCorso = false;
   async function scatta(n, et) {
-    await assicuraPermessoFotocamera();
-    var risultato;
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      risultato = await catturaConGetUserMedia();
-    }
-    if (risultato === undefined) risultato = await catturaConCameraNativa();   // ripiego
-    if (!risultato) return;   // annullato dall'utente
-    var nomeFile = (n ? String(n) : 'libero') + '__' + Date.now() + '.' + risultato.formato;
+    if (scattoInCorso) { toast('Scatto in corso: attendi un attimo e ritocca'); return; }
+    scattoInCorso = true;
     try {
-      await Filesystem.writeFile({
-        path: cartellaFotoSessione() + '/' + nomeFile,
-        data: risultato.base64,
-        directory: DIR_DATA,
-        recursive: true
-      });
-      toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero'));
-    } catch (e) {
-      toast('Salvataggio foto non riuscito: ' + (e && e.message ? e.message : e));
+      await assicuraPermessoFotocamera();
+      var risultato;
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        risultato = await catturaConGetUserMedia();
+      }
+      if (risultato === undefined) risultato = await catturaConCameraNativa();   // ripiego
+      if (!risultato) return;   // annullato dall'utente (Annulla, o fotocamera nativa chiusa)
+      var nomeFile = (n ? String(n) : 'libero') + '__' + Date.now() + '.' + risultato.formato;
+      try {
+        await Filesystem.writeFile({
+          path: cartellaFotoSessione() + '/' + nomeFile,
+          data: risultato.base64,
+          directory: DIR_DATA,
+          recursive: true
+        });
+        toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero'));
+      } catch (e) {
+        toast('Salvataggio foto non riuscito: ' + (e && e.message ? e.message : e));
+      }
+    } finally {
+      scattoInCorso = false;
     }
   }
 
@@ -414,8 +432,17 @@
     if (!banner || !rifBottone || document.getElementById('bScattaAncora')) return;
     var b = document.createElement('button');
     b.id = 'bScattaAncora'; b.type = 'button'; b.textContent = '+ Foto';
-    b.addEventListener('click', function () {
-      if (attivo) scatta(attivo.n, attivo.etichetta);   // "attivo" e' la variabile globale del taccuino (non window.attivo: e' dichiarata con let)
+    b.addEventListener('click', async function () {
+      if (!attivo || b.disabled) return;
+      // "attivo" e' la variabile globale del taccuino (non window.attivo: e' dichiarata con let).
+      // Il pulsante si disabilita durante lo scatto: da' un riscontro visivo
+      // immediato (prima si vedeva solo il toast finale) e, insieme al
+      // lucchetto in scatta(), evita che un secondo tocco impaziente parta
+      // mentre la fotocamera precedente e' ancora aperta.
+      var testoOrig = b.textContent;
+      b.disabled = true; b.textContent = '· · ·';
+      try { await scatta(attivo.n, attivo.etichetta); }
+      finally { b.disabled = false; b.textContent = testoOrig; }
     });
     rifBottone.parentNode.insertBefore(b, rifBottone);
   }
