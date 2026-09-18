@@ -57,7 +57,17 @@
       foto private dell'app) tutti i sopralluoghi gia' in elenco tranne
       quello aperto in questo momento, per non lasciare accumulare negozi
       gia' esportati e lavorati. Chiede sempre conferma prima, perche' non e'
-      reversibile. */
+      reversibile.
+   7. Il numero di foto mostrato sulla piastrella, nell'elenco e in testata
+      ora conta gli scatti davvero salvati, non le "finestre" (un intervallo
+      aperto/chiuso) come nel taccuino originale: quel conteggio va bene
+      nella versione da browser, dove le foto le scatta un'altra app e si
+      abbinano dopo per orario, ma qui faceva sembrare che "+ Foto" non
+      aggiungesse nulla dopo il primo scatto, perche' il numero restava
+      legato all'apertura/chiusura della scheda invece che ai tocchi sul
+      pulsante. L'array "foto" originale (e quindi l'export JSON/HTML/PDF)
+      non viene toccato: il conteggio vero vive in un campo aggiuntivo di
+      "stato" (fotoScattate), salvato insieme al resto. */
 (function () {
   function nativo() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -219,6 +229,28 @@
   // insieme, e un avviso esplicito segnala quando un tocco viene ignorato o
   // quando lo scatto fallisce davvero, cosi' non resta piu' nulla di muto.
   var scattoInCorso = false;
+
+  // Quante foto sono state DAVVERO scattate per un punto (o per "libero"),
+  // a prescindere da quante volte la scheda e' stata aperta e chiusa. Il
+  // taccuino originale conta invece le "finestre" (un intervallo di tempo,
+  // chiuso solo quando si tocca di nuovo la piastrella o "Chiudi"): e'
+  // corretto per la versione da browser, dove le foto le scatta un'altra
+  // app e si abbinano dopo per orario, ma qui, dove ogni tocco su "+ Foto"
+  // e' una foto vera gia' salvata, faceva sembrare che "+ Foto" aggiungesse
+  // una foto sola anche dopo piu' scatti, perche' il numero mostrato sulla
+  // piastrella restava quello delle finestre, non degli scatti. Il contatore
+  // qui sotto e' un dato in piu' dentro "stato" (si salva col resto, non
+  // sostituisce ne' altera l'array "foto" originale usato per l'export).
+  function contaFotoNative(s, n) {
+    return (s.fotoScattate && s.fotoScattate[n ? String(n) : 'libero']) || 0;
+  }
+  function incrementaContaFotoNative(n) {
+    var s = sessione();
+    if (!s.fotoScattate) s.fotoScattate = {};
+    var chiave = n ? String(n) : 'libero';
+    s.fotoScattate[chiave] = (s.fotoScattate[chiave] || 0) + 1;
+  }
+
   async function scatta(n, et) {
     if (scattoInCorso) { toast('Scatto in corso: attendi un attimo e ritocca'); return; }
     scattoInCorso = true;
@@ -238,7 +270,11 @@
           directory: DIR_DATA,
           recursive: true
         });
-        toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero'));
+        incrementaContaFotoNative(n);
+        salva();
+        rendiTutto();   // aggiorna subito il numero di foto sulla piastrella
+        toast('Foto acquisita' + (n ? ' · punto ' + n : ' · rilievo libero') +
+          ' (' + contaFotoNative(sessione(), n) + ' in questo punto)');
       } catch (e) {
         toast('Salvataggio foto non riuscito: ' + (e && e.message ? e.message : e));
       }
@@ -375,6 +411,89 @@
   window.rendiTesta = function () {
     _rendiTesta();
     aggiornaBloccoNegozio();
+    aggiornaContaFotoReale();
+  };
+
+  // Le tre funzioni che seguono correggono, dopo che il taccuino originale
+  // ha gia' disegnato la sua parte, i numeri di foto mostrati a video:
+  // sostituiscono il conteggio delle "finestre" con quello degli scatti
+  // realmente salvati (vedi contaFotoNative sopra). Non toccano r.foto ne'
+  // s.libere, quindi l'export (JSON/HTML/PDF) resta quello di sempre.
+  function totaleFotoNative(s) {
+    var tot = 0;
+    if (s && s.fotoScattate) Object.keys(s.fotoScattate).forEach(function (k) { tot += s.fotoScattate[k]; });
+    return tot;
+  }
+  function aggiornaContaFotoReale() {
+    var s = sessione();
+    var conta = document.getElementById('conta');
+    if (!conta || !s) return;
+    var spans = conta.querySelectorAll('span');
+    if (spans.length < 2) return;
+    spans[1].innerHTML = '<b>' + totaleFotoNative(s) + '</b> foto scattate';
+  }
+  function aggiornaFotoPiastrelle() {
+    var s = sessione();
+    if (!s) return;
+    document.querySelectorAll('#piastrelle .piastrella').forEach(function (el) {
+      var tag = el.querySelector('.tag');
+      if (!tag) return;
+      var m = /^p\.(\d+)$/.exec(tag.textContent.trim());
+      if (!m) return;
+      var count = contaFotoNative(s, Number(m[1]));
+      var pie = el.querySelector('.pie');
+      if (!pie) return;
+      var spanFoto = null;
+      pie.querySelectorAll('span').forEach(function (sp) {
+        if (/^\d+ foto$/.test(sp.textContent.trim())) spanFoto = sp;
+      });
+      if (count > 0) {
+        var testo = count + ' foto';
+        if (spanFoto) { spanFoto.textContent = testo; }
+        else {
+          var nuovo = document.createElement('span'); nuovo.textContent = testo;
+          var rifIns = null;
+          pie.querySelectorAll('span').forEach(function (sp) {
+            var t = sp.textContent.trim();
+            if (!rifIns && (t === 'nota' || t === 'in corso')) rifIns = sp;
+          });
+          if (rifIns) pie.insertBefore(nuovo, rifIns); else pie.appendChild(nuovo);
+        }
+      } else if (spanFoto) {
+        spanFoto.remove();   // nessuno scatto davvero riuscito: niente numero fuorviante
+      }
+    });
+  }
+  function aggiornaFotoElenco() {
+    var s = sessione();
+    if (!s) return;
+    document.querySelectorAll('#elenco .punto').forEach(function (el) {
+      var numEl = el.querySelector('.num');
+      if (!numEl) return;
+      var count = contaFotoNative(s, Number(numEl.textContent.trim()));
+      var spanFoto = el.querySelector('.foto');
+      if (count > 0) {
+        var testo = 'FOTO ' + count;
+        if (spanFoto) { spanFoto.textContent = testo; }
+        else {
+          var txt = el.querySelector('.txt');
+          if (txt) {
+            var nuovo = document.createElement('span'); nuovo.className = 'foto'; nuovo.textContent = testo;
+            txt.appendChild(nuovo);
+          }
+        }
+      } else if (spanFoto) { spanFoto.remove(); }
+    });
+  }
+  var _rendiPiastrelle = window.rendiPiastrelle;
+  window.rendiPiastrelle = function () {
+    _rendiPiastrelle();
+    aggiornaFotoPiastrelle();
+  };
+  var _rendiElenco = window.rendiElenco;
+  window.rendiElenco = function () {
+    _rendiElenco();
+    aggiornaFotoElenco();
   };
 
   // Etichetta del tab: resta lo stesso tab "Giro" del taccuino originale
