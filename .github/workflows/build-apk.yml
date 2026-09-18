@@ -36,7 +36,7 @@ jobs:
 
       - name: Compila APK di debug
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon 2>&1 | tee ../build.log
 
       - name: Carica APK come artefatto della run
         uses: actions/upload-artifact@v4
@@ -56,4 +56,15 @@ jobs:
           gh release create latest taccuino-sopralluogo.apk \
             --title "Taccuino Sopralluogo — ultima build" \
             --notes "APK di debug compilato automaticamente dal commit ${{ github.sha }}." \
+            --target ${{ github.sha }}
+
+      - name: Pubblica il log di build in caso di errore (stesso motivo: github.com, non Azure blob)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete build-log --yes --cleanup-tag || true
+          gh release create build-log build.log \
+            --title "Taccuino Sopralluogo — log ultima build fallita" \
+            --notes "Log di build del commit ${{ github.sha }}." \
             --target ${{ github.sha }}
